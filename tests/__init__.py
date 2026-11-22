@@ -1,0 +1,1 @@
+"""Tests for the Cruise Trip Booking Application."""

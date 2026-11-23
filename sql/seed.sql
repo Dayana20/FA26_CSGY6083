@@ -1,0 +1,4 @@
+-- Dummy data for the project database.
+-- Paste the INSERT statements here.
+--
+-- Insert into parent tables before child tables so foreign keys resolve.

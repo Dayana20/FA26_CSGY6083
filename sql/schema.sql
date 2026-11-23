@@ -5,15 +5,23 @@
 --     the type, and each stateroom references its type.
 --   * Additional CHECK constraints for formats (email, phone, state, zip) and
 --     ranges (positive counts, non-negative money, end dates after start dates).
+--   * ADH_USER_ACCOUNT added for app logins (passwords stored only as hashes).
+--   * A stateroom can be booked only once per trip; every booking, trip and
+--     port stop must name its stateroom, ship and port.
+--   * Customer STATE and ZIPCODE are optional; customer STREET widened to 100.
 --   * ADH_PORT.STATE and ZIPCODE are optional (ports outside the US have
 --     neither); ADH_BOOKING.STATEROOM_PRICE_PER_NIGHT widened to DECIMAL(8,2).
---   * Code columns (STATE, GENDER, RATE_TYPE) use a case-sensitive collation so
+--   * Code columns (STATE, GENDER, RATE_TYPE, PAYMENT_METHOD) use a case-sensitive collation so
 --     their checks only accept uppercase.
 --   * Oracle-only syntax replaced: NUMBER -> INT/SMALLINT/DECIMAL,
 --     VARCHAR2 -> VARCHAR, COMMENT ON COLUMN -> inline COMMENT, restaurant
 --     opening/closing times DATE -> TIME.
 --   * The ALTER TABLE statements at the end of the original folded into the
 --     CREATE TABLE statements.
+--
+-- Rows can't be deleted through the app: its MySQL user is only granted
+-- SELECT, INSERT and UPDATE (see app/database/init_db.py), and foreign keys
+-- block deleting any row other rows still reference.
 --
 -- Tables are created parents first so every FOREIGN KEY target already exists.
 -- Run through the setup script: python -m app.database.init_db
@@ -34,10 +42,10 @@ CREATE TABLE ADH_CUSTOMER (
     F_NAME      VARCHAR(30)  NOT NULL COMMENT 'Customer first name',
     L_NAME      VARCHAR(30)  NOT NULL COMMENT 'Customer last name',
     DOB         DATE         NOT NULL COMMENT 'Customer date of birth',
-    STREET      VARCHAR(30)  NOT NULL COMMENT 'Street address',
+    STREET      VARCHAR(100) NOT NULL COMMENT 'Street address',
     CITY        VARCHAR(30)  NOT NULL COMMENT 'Address city',
-    STATE       VARCHAR(2)   COLLATE utf8mb4_bin NOT NULL COMMENT 'Address state (2-letter code)',
-    ZIPCODE     VARCHAR(5)   NOT NULL COMMENT 'Zipcode (5 digits)',
+    STATE       VARCHAR(2)   COLLATE utf8mb4_bin COMMENT 'Address state (2-letter code, optional)',
+    ZIPCODE     VARCHAR(5)            COMMENT 'Zipcode (5 digits, optional)',
     COUNTRY     VARCHAR(30)  NOT NULL COMMENT 'Address country',
     GENDER      VARCHAR(1)   COLLATE utf8mb4_bin COMMENT 'Gender: M, F or X (optional)',
     NATIONALITY VARCHAR(30)  NOT NULL COMMENT 'Customer nationality',
@@ -56,6 +64,26 @@ CREATE TABLE ADH_CUSTOMER (
     CONSTRAINT C_CUSTOMER_EMAIL CHECK (EMAIL REGEXP '^[^@ ]+@[^@ ]+[.][^@ ]+$'),
     CONSTRAINT C_CUSTOMER_PHONE CHECK (PHONE REGEXP '^[+]?[0-9][0-9 ().-]{6,19}$')
 ) COMMENT = 'A passenger; every customer belongs to one group';
+
+
+CREATE TABLE ADH_USER_ACCOUNT (
+    USER_ID       INT          NOT NULL AUTO_INCREMENT COMMENT 'User account ID',
+    USERNAME      VARCHAR(30)  NOT NULL COMMENT 'Login name',
+    PASSWORD_HASH VARCHAR(255) NOT NULL COMMENT 'Password hash (bcrypt or argon2), never the plain password',
+    ROLE          VARCHAR(10)  COLLATE utf8mb4_bin NOT NULL DEFAULT 'CUSTOMER' COMMENT 'CUSTOMER or ADMIN',
+    CUSTOMER_ID   INT                   COMMENT 'Customer this login belongs to (required for CUSTOMER)',
+    CREATED_AT    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When the account was created',
+    LAST_LOGIN_AT DATETIME              COMMENT 'Most recent successful login',
+    CONSTRAINT ADH_USER_ACCOUNT_PK PRIMARY KEY (USER_ID),
+    CONSTRAINT ADH_USER_ACCOUNT_USERNAME_UK UNIQUE (USERNAME),
+    CONSTRAINT ADH_USER_ACCOUNT_CUSTOMER_UK UNIQUE (CUSTOMER_ID),
+    CONSTRAINT ADH_USER_ACCOUNT_CUSTOMER_FK FOREIGN KEY (CUSTOMER_ID)
+        REFERENCES ADH_CUSTOMER (CUSTOMER_ID),
+    CONSTRAINT C_USER_USERNAME CHECK (USERNAME REGEXP '^[A-Za-z0-9_.-]{3,30}$'),
+    CONSTRAINT C_USER_PASSWORD_HASH CHECK (CHAR_LENGTH(PASSWORD_HASH) >= 60),
+    CONSTRAINT C_USER_ROLE CHECK (ROLE IN ('CUSTOMER', 'ADMIN')),
+    CONSTRAINT C_USER_CUSTOMER CHECK (ROLE = 'ADMIN' OR CUSTOMER_ID IS NOT NULL)
+) COMMENT = 'A login for the demo app: a customer, or an admin with no customer record';
 
 
 -- ---------------------------------------------------------------------------
@@ -174,7 +202,7 @@ CREATE TABLE ADH_TRIP (
     TRIP_ID    INT  NOT NULL AUTO_INCREMENT COMMENT 'Trip ID',
     START_DATE DATE NOT NULL COMMENT 'Start date',
     END_DATE   DATE NOT NULL COMMENT 'End date',
-    SHIP_ID    INT           COMMENT 'Cruise ship id',
+    SHIP_ID    INT  NOT NULL COMMENT 'Cruise ship id',
     CONSTRAINT ADH_TRIP_PK PRIMARY KEY (TRIP_ID),
     CONSTRAINT ADH_TRIP_CS_FK FOREIGN KEY (SHIP_ID)
         REFERENCES ADH_CRUISE_SHIP (SHIP_ID),
@@ -186,7 +214,7 @@ CREATE TABLE ADH_PORT_STOP (
     PSTART_DATE DATE     NOT NULL COMMENT 'Port start date',
     PEND_DATE   DATE     NOT NULL COMMENT 'Port end date',
     TRIP_ID     INT      NOT NULL COMMENT 'trip id',
-    PORT_ID     INT               COMMENT 'port id',
+    PORT_ID     INT      NOT NULL COMMENT 'port id',
     CONSTRAINT ADH_PORT_STOP_PK PRIMARY KEY (STOP_NO, TRIP_ID),
     CONSTRAINT ADH_PORT_STOP_TRIP_FK FOREIGN KEY (TRIP_ID)
         REFERENCES ADH_TRIP (TRIP_ID),
@@ -219,7 +247,7 @@ CREATE TABLE ADH_BOOKING (
     STATEROOM_PRICE_PER_NIGHT DECIMAL(8,2) NOT NULL COMMENT 'Stateroom price per night',
     GROUP_ID                  INT          NOT NULL COMMENT 'Group ID',
     TRIP_ID                   INT          NOT NULL COMMENT 'Trip ID',
-    STATEROOM_ID              INT                   COMMENT 'Stateroom ID',
+    STATEROOM_ID              INT          NOT NULL COMMENT 'Stateroom ID',
     CONSTRAINT ADH_BOOKING_PK PRIMARY KEY (BOOKING_ID),
     CONSTRAINT ADH_BOOKING_GROUP_FK FOREIGN KEY (GROUP_ID)
         REFERENCES ADH_GROUP (GROUP_ID),
@@ -227,6 +255,7 @@ CREATE TABLE ADH_BOOKING (
         REFERENCES ADH_TRIP (TRIP_ID),
     CONSTRAINT ADH_BOOKING_STATEROOM_FK FOREIGN KEY (STATEROOM_ID)
         REFERENCES ADH_STATEROOM (STATEROOM_ID),
+    CONSTRAINT ADH_BOOKING_TRIP_STATEROOM_UK UNIQUE (TRIP_ID, STATEROOM_ID),
     CONSTRAINT C_BOOKING_PRICE CHECK (STATEROOM_PRICE_PER_NIGHT > 0)
 ) COMMENT = 'A group''s reservation of a stateroom on a trip; also the invoice';
 
@@ -247,11 +276,11 @@ CREATE TABLE ADH_TRANSACTION (
     TRANSACTION_ID INT           NOT NULL AUTO_INCREMENT COMMENT 'Transaction ID',
     PAYMENT_DATE   DATE          NOT NULL COMMENT 'Payment date',
     PAYMENT_AMOUNT DECIMAL(9,2)  NOT NULL DEFAULT 0 COMMENT 'Payment amount',
-    PAYMENT_METHOD VARCHAR(30)   NOT NULL COMMENT 'Payment Method',
+    PAYMENT_METHOD VARCHAR(30)   COLLATE utf8mb4_bin NOT NULL COMMENT 'Payment method: Credit or ACH',
     BOOKING_ID     INT           NOT NULL COMMENT 'Booking ID',
     CONSTRAINT ADH_TRANSACTION_PK PRIMARY KEY (TRANSACTION_ID),
     CONSTRAINT ADH_TRANSACTION_BOOKING_FK FOREIGN KEY (BOOKING_ID)
         REFERENCES ADH_BOOKING (BOOKING_ID),
     CONSTRAINT C_TRANSACTION_AMOUNT CHECK (PAYMENT_AMOUNT >= 0),
-    CONSTRAINT C_TRANSACTION_METHOD CHECK (TRIM(PAYMENT_METHOD) <> '')
+    CONSTRAINT C_TRANSACTION_METHOD CHECK (PAYMENT_METHOD IN ('Credit', 'ACH'))
 ) COMMENT = 'A payment toward a booking; a booking can be paid in several parts';

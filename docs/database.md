@@ -12,6 +12,8 @@ and new rows get the next number.
 ## How It Fits Together
 
 - A **group** is a travel party. Each **customer** belongs to one group.
+- A customer can have a **user account** to log in to the app. Admin
+  accounts have no customer record.
 - A **cruise ship** has **staterooms**, **restaurants** and **activities**.
   Each stateroom is of a **stateroom type** (size, beds, bathrooms, balconies)
   and sits in a **part** of the ship.
@@ -28,18 +30,19 @@ and new rows get the next number.
 ```mermaid
 erDiagram
     ADH_GROUP ||--o{ ADH_CUSTOMER : "has members"
+    ADH_CUSTOMER |o--o| ADH_USER_ACCOUNT : "logs in with"
     ADH_GROUP ||--o{ ADH_BOOKING : makes
     ADH_TRIP ||--o{ ADH_BOOKING : "is booked in"
-    ADH_STATEROOM |o--o{ ADH_BOOKING : "is reserved by"
+    ADH_STATEROOM ||--o{ ADH_BOOKING : "is reserved by"
     ADH_CRUISE_SHIP ||--o{ ADH_STATEROOM : has
     ADH_CRUISE_SHIP_PART ||--o{ ADH_STATEROOM : contains
     ADH_STATEROOM_TYPE ||--o{ ADH_STATEROOM : "describes"
     ADH_CRUISE_SHIP ||--o{ ADH_RESTAURANT : has
     ADH_CRUISE_SHIP ||--o{ ADH_SHIP_ACTIVITY : offers
     ADH_ACTIVITY ||--o{ ADH_SHIP_ACTIVITY : "is offered as"
-    ADH_CRUISE_SHIP |o--o{ ADH_TRIP : sails
+    ADH_CRUISE_SHIP ||--o{ ADH_TRIP : sails
     ADH_TRIP ||--o{ ADH_PORT_STOP : "stops at"
-    ADH_PORT |o--o{ ADH_PORT_STOP : "is visited in"
+    ADH_PORT ||--o{ ADH_PORT_STOP : "is visited in"
     ADH_BOOKING ||--o{ ADH_PACKAGE_BOOKED : includes
     ADH_CUSTOMER ||--o{ ADH_PACKAGE_BOOKED : buys
     ADH_PACKAGE ||--o{ ADH_PACKAGE_BOOKED : "is bought as"
@@ -51,6 +54,10 @@ erDiagram
     ADH_CUSTOMER {
         int CUSTOMER_ID PK
         int GROUP_ID FK
+    }
+    ADH_USER_ACCOUNT {
+        int USER_ID PK
+        int CUSTOMER_ID FK
     }
     ADH_CRUISE_SHIP {
         int SHIP_ID PK
@@ -111,8 +118,9 @@ erDiagram
     }
 ```
 
-`||` means exactly one and `|o` means zero or one (the foreign key is optional).
-`o{` means zero or more.
+`||` means exactly one and `|o` means zero or one. `o{` means zero or more.
+For example, a customer has zero or one user account, and an admin account
+has zero or one customer.
 
 ## Tables
 
@@ -121,7 +129,7 @@ keys (FK → the table referenced). **Rules** lists the CHECK and UNIQUE
 constraints. Inserting a row that breaks a rule fails with an error naming the
 constraint.
 
-## Groups and customers
+## Groups, customers and logins
 
 ### ADH_GROUP
 
@@ -141,10 +149,10 @@ A passenger; every customer belongs to one group.
 | `F_NAME` | VARCHAR(30) | No |  | Customer first name |
 | `L_NAME` | VARCHAR(30) | No |  | Customer last name |
 | `DOB` | DATE | No |  | Customer date of birth |
-| `STREET` | VARCHAR(30) | No |  | Street address |
+| `STREET` | VARCHAR(100) | No |  | Street address |
 | `CITY` | VARCHAR(30) | No |  | Address city |
-| `STATE` | VARCHAR(2) | No |  | Address state (2-letter code) |
-| `ZIPCODE` | VARCHAR(5) | No |  | Zipcode (5 digits) |
+| `STATE` | VARCHAR(2) | Yes |  | Address state (2-letter code, optional) |
+| `ZIPCODE` | VARCHAR(5) | Yes |  | Zipcode (5 digits, optional) |
 | `COUNTRY` | VARCHAR(30) | No |  | Address country |
 | `GENDER` | VARCHAR(1) | Yes |  | Gender: M, F or X (optional) |
 | `NATIONALITY` | VARCHAR(30) | No |  | Customer nationality |
@@ -156,11 +164,32 @@ A passenger; every customer belongs to one group.
 
 - First and last name can't be blank.
 - Date of birth is on or after 1900-01-01.
-- `STATE` is two uppercase letters (e.g. `FL`).
-- `ZIPCODE` is exactly 5 digits.
+- `STATE` and `ZIPCODE` are optional, for customers outside the US. If given, `STATE` is two uppercase letters (e.g. `FL`) and `ZIPCODE` is exactly 5 digits.
 - `GENDER`, if given, is `M`, `F` or `X`.
 - `EMAIL` looks like `name@domain.tld` (one `@`, a dot after it, no spaces).
 - `PHONE` is 7–20 characters of digits, spaces, `(`, `)`, `-` or `.`, optionally starting with `+`.
+
+### ADH_USER_ACCOUNT
+
+A login for the demo app: a customer, or an admin with no customer record.
+
+| Column | Type | Null? | Key | Description |
+| --- | --- | --- | --- | --- |
+| `USER_ID` | INT | No | PK | User account ID |
+| `USERNAME` | VARCHAR(30) | No | Unique | Login name |
+| `PASSWORD_HASH` | VARCHAR(255) | No |  | Password hash (bcrypt or argon2), never the plain password |
+| `ROLE` | VARCHAR(10) | No |  | CUSTOMER or ADMIN (default 'CUSTOMER') |
+| `CUSTOMER_ID` | INT | Yes | FK → ADH_CUSTOMER, Unique | Customer this login belongs to (required for CUSTOMER) |
+| `CREATED_AT` | DATETIME | No |  | When the account was created (default current_timestamp()) |
+| `LAST_LOGIN_AT` | DATETIME | Yes |  | Most recent successful login |
+
+**Rules:**
+
+- `USERNAME` is unique and 3–30 letters, digits, `_`, `.` or `-`.
+- `PASSWORD_HASH` is at least 60 characters, so a plain password can't be stored by mistake. The app must hash passwords (bcrypt or argon2) before saving them.
+- `ROLE` is `CUSTOMER` (the default) or `ADMIN`.
+- A `CUSTOMER` account must point to a customer. An `ADMIN` account may have no customer.
+- Each customer has at most one account.
 
 ## Ships and what is on them
 
@@ -306,7 +335,7 @@ A cruise: one ship sailing between two dates.
 | `TRIP_ID` | INT | No | PK | Trip ID |
 | `START_DATE` | DATE | No |  | Start date |
 | `END_DATE` | DATE | No |  | End date |
-| `SHIP_ID` | INT | Yes | FK → ADH_CRUISE_SHIP | Cruise ship id |
+| `SHIP_ID` | INT | No | FK → ADH_CRUISE_SHIP | Cruise ship id |
 
 **Rules:**
 
@@ -322,7 +351,7 @@ One stop on a trip itinerary, in order.
 | `PSTART_DATE` | DATE | No |  | Port start date |
 | `PEND_DATE` | DATE | No |  | Port end date |
 | `TRIP_ID` | INT | No | PK, FK → ADH_TRIP | trip id |
-| `PORT_ID` | INT | Yes | FK → ADH_PORT | port id |
+| `PORT_ID` | INT | No | FK → ADH_PORT | port id |
 
 **Rules:**
 
@@ -359,11 +388,12 @@ A group's reservation of a stateroom on a trip; also the invoice.
 | `INVOICE_DATE` | DATE | No |  | Invoice date |
 | `STATEROOM_PRICE_PER_NIGHT` | DECIMAL(8,2) | No |  | Stateroom price per night |
 | `GROUP_ID` | INT | No | FK → ADH_GROUP | Group ID |
-| `TRIP_ID` | INT | No | FK → ADH_TRIP | Trip ID |
-| `STATEROOM_ID` | INT | Yes | FK → ADH_STATEROOM | Stateroom ID |
+| `TRIP_ID` | INT | No | FK → ADH_TRIP, Unique | Trip ID |
+| `STATEROOM_ID` | INT | No | FK → ADH_STATEROOM, Unique | Stateroom ID |
 
 **Rules:**
 
+- A stateroom can be booked only once per trip (unique `TRIP_ID` + `STATEROOM_ID`).
 - `STATEROOM_PRICE_PER_NIGHT` is greater than 0.
 
 ### ADH_PACKAGE_BOOKED
@@ -389,13 +419,13 @@ A payment toward a booking; a booking can be paid in several parts.
 | `TRANSACTION_ID` | INT | No | PK | Transaction ID |
 | `PAYMENT_DATE` | DATE | No |  | Payment date |
 | `PAYMENT_AMOUNT` | DECIMAL(9,2) | No |  | Payment amount (default 0.00) |
-| `PAYMENT_METHOD` | VARCHAR(30) | No |  | Payment Method |
+| `PAYMENT_METHOD` | VARCHAR(30) | No |  | Payment method: Credit or ACH |
 | `BOOKING_ID` | INT | No | FK → ADH_BOOKING | Booking ID |
 
 **Rules:**
 
 - `PAYMENT_AMOUNT` is 0 or more and defaults to 0.
-- Payment method can't be blank.
+- `PAYMENT_METHOD` is `Credit` or `ACH`.
 
 ## Rules the Database Does Not Enforce
 
@@ -406,8 +436,18 @@ dummy data and the API should follow them:
 - A ship activity or restaurant `FLOOR` is no higher than the ship's `NO_OF_FLOORS`.
 - A port stop's dates fall within its trip's `START_DATE`–`END_DATE`.
 - A booked stateroom is on the same ship as the trip.
-- A stateroom isn't booked twice for the same trip.
 - A customer in `ADH_PACKAGE_BOOKED` belongs to the group that made the booking.
+
+## Deleting Data
+
+Rows can't be deleted through the app. The app's MySQL user (from `.env`) is
+granted only `SELECT`, `INSERT` and `UPDATE`, so any `DELETE` fails with
+"DELETE command denied". It also can't create, change or drop tables. Foreign
+keys add a second layer: even an admin can't delete a row that other rows still
+reference, such as a trip that has bookings.
+
+To start over during development, rebuild the database with
+`python -m app.database.init_db --reset`.
 
 ## Changes From the Original Oracle Design
 
@@ -415,7 +455,13 @@ dummy data and the API should follow them:
   to be repeated on every stateroom row. They now live on the type, and
   `ADH_STATEROOM.SR_TYPE_ID` points to it. The old `SR_NAME` became the type's
   `SR_TYPE_NAME`.
-- **Port `STATE` and `ZIPCODE` are optional** for ports outside the US.
+- **New `ADH_USER_ACCOUNT` table** for app logins, storing password hashes only.
+- **No double bookings:** a stateroom can be booked only once per trip.
+- **Required links:** every booking names a stateroom, every trip names a ship,
+  and every port stop names a port.
+- **Payment method** is limited to `Credit` or `ACH`.
+- **`STATE` and `ZIPCODE` are optional** for customers and ports outside the US.
+- **Customer `STREET` widened** from 30 to 100 characters.
 - **`STATEROOM_PRICE_PER_NIGHT` widened** from `DECIMAL(5,2)` (max 999.99) to
   `DECIMAL(8,2)` (max 999,999.99).
 - **More CHECK constraints** for formats and ranges (see each table's Rules).

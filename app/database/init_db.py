@@ -7,9 +7,10 @@ Run from the project root:
 
 Steps:
   1. Connect as the MySQL admin (root) and create the project database and the
-     app user from .env, granting the user access to the database.
-  2. Create the tables by running sql/schema.sql.
-  3. Insert the dummy data by running sql/seed.sql.
+     app user from .env. The app user may only read, add and update rows
+     (SELECT, INSERT, UPDATE): it can't delete rows or change the tables.
+  2. Create the tables by running sql/schema.sql (as root).
+  3. Insert the dummy data by running sql/seed.sql (as root).
   4. With --reset, drop the database first so everything is rebuilt from scratch.
 
 If the database already has tables, steps 2-3 are skipped so existing data is
@@ -36,6 +37,11 @@ SEED_FILE = SQL_DIR / "seed.sql"
 # The app user is created for both host names, because depending on the MySQL
 # configuration a connection to 127.0.0.1 is seen as either one.
 APP_USER_HOSTS = ("localhost", "127.0.0.1")
+
+# What the app user may do in the project database. No DELETE, so rows can't
+# be deleted through the app, and no DROP/ALTER/CREATE, so it can't change the
+# schema. Schema and dummy data are loaded as root instead.
+APP_USER_PRIVILEGES = "SELECT, INSERT, UPDATE"
 
 # Statements in the SQL files that would conflict with the database this
 # script manages. They are skipped with a note.
@@ -234,8 +240,17 @@ def create_database_and_user(settings: dict, *, reset: bool) -> None:
                 "ALTER USER %s@%s IDENTIFIED BY %s",
                 (*account, settings["password"]),
             )
+            # Remove any broader access granted earlier (e.g. GRANT ALL from the
+            # old manual setup), then grant only what the app needs.
+            try:
+                cursor.execute(
+                    f"REVOKE ALL PRIVILEGES ON `{database}`.* FROM %s@%s", account
+                )
+            except mysql.connector.Error as exc:
+                if exc.errno != errorcode.ER_NONEXISTING_GRANT:
+                    raise
             cursor.execute(
-                f"GRANT ALL PRIVILEGES ON `{database}`.* TO %s@%s", account
+                f"GRANT {APP_USER_PRIVILEGES} ON `{database}`.* TO %s@%s", account
             )
         cursor.execute("FLUSH PRIVILEGES")
     finally:
@@ -278,9 +293,8 @@ def main(argv: list[str] | None = None) -> int:
         # Step 1 (and step 4 when --reset): database and user, as root.
         create_database_and_user(settings, reset=args.reset)
 
-        # Steps 2-3: tables and data, as the app user (this also proves the
-        # credentials in .env work).
-        connection = connect(settings, as_root=False, database=settings["database"])
+        # Steps 2-3: tables and data, as root (the app user can't create tables).
+        connection = connect(settings, as_root=True, database=settings["database"])
         try:
             if has_tables(connection):
                 print(
@@ -296,6 +310,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {count} statement(s) run.")
         finally:
             connection.close()
+
+        # Make sure the app can log in with the credentials in .env.
+        connect(settings, as_root=False, database=settings["database"]).close()
     except SetupError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

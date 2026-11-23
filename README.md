@@ -59,7 +59,8 @@ python -m app.database.init_db
 
 This connects as root and:
 
-1. creates the database and your app user, and gives the user access to the database,
+1. creates the database and your app user. The app user can read, add and
+   update rows but can't delete them (see [Deleting Data](docs/database.md#deleting-data)),
 2. creates the tables from `sql/schema.sql`,
 3. loads the dummy data from `sql/seed.sql`.
 

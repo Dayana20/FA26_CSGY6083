@@ -20,16 +20,27 @@
    ```
 
 4. Create a `.env` file in the project root using `.env.example` as a template. Set
-   `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_DATABASE` to match the MySQL user,
-   password, and database you created. The default local connection uses
-   `127.0.0.1:3306`.
+   `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`, and a strong random
+   `SESSION_SECRET_KEY`. The default local connection uses `127.0.0.1:3306`.
+
+5. Initialize the authentication tables (`ADH_CUSTOMER` and `ADH_USER`) safely after
+   configuring `.env` and starting your local MySQL server:
+
+   ```bash
+   python scripts/init_auth_schema.py
+   ```
+
+   You can also inspect or run the non-destructive SQL script directly in MySQL Workbench:
+   `sql/001_create_auth_tables.sql`.
 
 ## Run the API
 
-Install the Python dependencies:
+Create and activate a project virtual environment, then install dependencies:
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
 ```
 
 Start the development server from the project root:
@@ -38,6 +49,17 @@ Start the development server from the project root:
 uvicorn main:app --reload
 ```
 
+## Run Tests
+
+```bash
+pytest -v
+```
+
 ## API Endpoints
 
+- Home page: <http://127.0.0.1:8000/>
+- Registration: <http://127.0.0.1:8000/register>
+- Login: <http://127.0.0.1:8000/login>
+- Customer Account (Role `C`): <http://127.0.0.1:8000/account>
+- Employee Portal (Role `E`): <http://127.0.0.1:8000/employee>
 - Interactive API documentation: <http://127.0.0.1:8000/docs>

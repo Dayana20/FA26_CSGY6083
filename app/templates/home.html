@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}ADH Cruises | Plan your next cruise{% endblock %}
+
+{% block content %}
+<main class="homepage">
+  <h1>Start your holiday with ADH Cruises</h1>
+  {% if current_user %}
+    <p class="homepage-subtitle">
+      Welcome back, {{ current_user.display_name }}.
+    </p>
+  {% endif %}
+</main>
+{% endblock %}

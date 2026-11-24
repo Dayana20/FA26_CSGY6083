@@ -1,4 +1,8 @@
-fastapi 
+fastapi
 uvicorn
 mysql-connector-python
 python-dotenv
+bcrypt
+itsdangerous
+jinja2
+python-multipart

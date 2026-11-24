@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}My Account | ADH Cruises{% endblock %}
+
+{% block content %}
+<main class="auth-page">
+  <section class="auth-card" aria-labelledby="account-heading">
+    <h1 id="account-heading" class="auth-title">Customer Account</h1>
+    <p class="auth-subtitle">Welcome, {{ current_user.display_name }}.</p>
+
+    <dl class="profile-list">
+      <div class="profile-item">
+        <dt>Customer ID</dt>
+        <dd>{{ current_user.customer_id }}</dd>
+      </div>
+      <div class="profile-item">
+        <dt>Full Name</dt>
+        <dd>{{ current_user.first_name }} {{ current_user.last_name }}</dd>
+      </div>
+      <div class="profile-item">
+        <dt>Email</dt>
+        <dd>{{ current_user.email }}</dd>
+      </div>
+      <div class="profile-item">
+        <dt>Phone</dt>
+        <dd>{{ current_user.phone }}</dd>
+      </div>
+      <div class="profile-item">
+        <dt>Address</dt>
+        <dd>{{ current_user.address }}</dd>
+      </div>
+    </dl>
+  </section>
+</main>
+{% endblock %}

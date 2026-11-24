@@ -1,0 +1,41 @@
+-- Authentication schema for ADH Cruises (CS-GY 6083 Project Part 2)
+-- Target database: da2410hc4288as23663
+-- Safe, non-destructive DDL: creates tables only if they do not already exist.
+
+CREATE DATABASE IF NOT EXISTS da2410hc4288as23663
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE da2410hc4288as23663;
+
+CREATE TABLE IF NOT EXISTS ADH_CUSTOMER (
+    CUSTOMER_ID INT          NOT NULL AUTO_INCREMENT,
+    FIRST_NAME  VARCHAR(100) NOT NULL,
+    LAST_NAME   VARCHAR(100) NOT NULL,
+    PHONE       VARCHAR(30)  NOT NULL,
+    ADDRESS     VARCHAR(255) NOT NULL,
+    CREATED_AT  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (CUSTOMER_ID)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ADH_USER (
+    USER_ID       INT          NOT NULL AUTO_INCREMENT,
+    EMAIL         VARCHAR(255) NOT NULL,
+    PASSWORD_HASH VARCHAR(255) NOT NULL,
+    ROLE          CHAR(1)      NOT NULL,
+    CUSTOMER_ID   INT          NULL,
+    CREATED_DATE  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (USER_ID),
+    UNIQUE KEY uq_adh_user_email (EMAIL),
+    UNIQUE KEY uq_adh_user_customer_id (CUSTOMER_ID),
+    CONSTRAINT chk_adh_user_role CHECK (ROLE IN ('C', 'E')),
+    CONSTRAINT fk_adh_user_customer
+        FOREIGN KEY (CUSTOMER_ID)
+        REFERENCES ADH_CUSTOMER (CUSTOMER_ID)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;

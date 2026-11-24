@@ -23,7 +23,8 @@ and new rows get the next number.
   records the nightly price at the time of booking.
 - Individual customers on a booking can add **packages** (e.g. drinks, Wi-Fi),
   charged per night or per trip.
-- A booking is paid through one or more **transactions**.
+- A booking is paid through **transactions**: several partial payments,
+  one payment in full, or none yet.
 
 ## Entity-Relationship Diagram
 
@@ -126,8 +127,9 @@ has zero or one customer.
 
 In each table, **Key** shows the primary key (PK), unique columns, and foreign
 keys (FK → the table referenced). **Rules** lists the CHECK and UNIQUE
-constraints. Inserting a row that breaks a rule fails with an error naming the
-constraint.
+constraints, plus triggers for rules that compare two tables. Inserting or
+updating a row that breaks a rule fails with an error naming the constraint, or
+the trigger's message.
 
 ## Groups, customers and logins
 
@@ -167,7 +169,7 @@ A passenger; every customer belongs to one group.
 - `STATE` and `ZIPCODE` are optional, for customers outside the US. If given, `STATE` is two uppercase letters (e.g. `FL`) and `ZIPCODE` is exactly 5 digits.
 - `GENDER`, if given, is `M`, `F` or `X`.
 - `EMAIL` looks like `name@domain.tld` (one `@`, a dot after it, no spaces).
-- `PHONE` is 7–20 characters of digits, spaces, `(`, `)`, `-` or `.`, optionally starting with `+`.
+- `PHONE` starts with a digit, or `+` and a digit, followed by digits, spaces, `(`, `)`, `-` or `.`: 7–20 characters in all (e.g. `617-555-0142`, `+44 20 7946 0958`). `(305) 555-0100` is rejected because it starts with `(`.
 
 ### ADH_USER_ACCOUNT
 
@@ -348,14 +350,15 @@ One stop on a trip itinerary, in order.
 | Column | Type | Null? | Key | Description |
 | --- | --- | --- | --- | --- |
 | `STOP_NO` | SMALLINT | No | PK | Order of stop in trip |
-| `PSTART_DATE` | DATE | No |  | Port start date |
-| `PEND_DATE` | DATE | No |  | Port end date |
+| `PSTART_DATE` | DATETIME | No |  | Arrival at the port (date and time) |
+| `PEND_DATE` | DATETIME | No |  | Departure from the port (date and time) |
 | `TRIP_ID` | INT | No | PK, FK → ADH_TRIP | trip id |
 | `PORT_ID` | INT | No | FK → ADH_PORT | port id |
 
 **Rules:**
 
 - `STOP_NO` starts at 1.
+- `PSTART_DATE` and `PEND_DATE` are date and time (arrival and departure).
 - `PEND_DATE` is on or after `PSTART_DATE`.
 - The key is stop number + trip, so each trip numbers its own stops.
 
@@ -395,6 +398,7 @@ A group's reservation of a stateroom on a trip; also the invoice.
 
 - A stateroom can be booked only once per trip (unique `TRIP_ID` + `STATEROOM_ID`).
 - `STATEROOM_PRICE_PER_NIGHT` is greater than 0.
+- `INVOICE_DATE` can't be moved later than a payment already made on the booking (trigger).
 
 ### ADH_PACKAGE_BOOKED
 
@@ -419,19 +423,21 @@ A payment toward a booking; a booking can be paid in several parts.
 | `TRANSACTION_ID` | INT | No | PK | Transaction ID |
 | `PAYMENT_DATE` | DATE | No |  | Payment date |
 | `PAYMENT_AMOUNT` | DECIMAL(9,2) | No |  | Payment amount (default 0.00) |
-| `PAYMENT_METHOD` | VARCHAR(30) | No |  | Payment method: Credit or ACH |
+| `PAYMENT_METHOD` | VARCHAR(30) | No |  | Payment method: Credit Card, Debit Card, Apple Pay, PayPal, Gift Card or Bank Transfer |
 | `BOOKING_ID` | INT | No | FK → ADH_BOOKING | Booking ID |
 
 **Rules:**
 
 - `PAYMENT_AMOUNT` is 0 or more and defaults to 0.
-- `PAYMENT_METHOD` is `Credit` or `ACH`.
+- `PAYMENT_METHOD` is `Credit Card`, `Debit Card`, `Apple Pay`, `PayPal`, `Gift Card` or `Bank Transfer`.
+- `PAYMENT_DATE` is on or after the booking's `INVOICE_DATE` (trigger). Payments after the trip has ended are allowed.
 
 ## Rules the Database Does Not Enforce
 
-CHECK constraints can only look at one row of one table. The rules below
-involve more than one table, so they are **not** enforced by the schema. The
-dummy data and the API should follow them:
+CHECK constraints can only look at one row of one table, so rules that
+compare tables need triggers. The payment-date rule has one (see
+`ADH_TRANSACTION`). The rules below don't, so they are **not** enforced by the
+schema. The dummy data follows them, and the API should too:
 
 - A ship activity or restaurant `FLOOR` is no higher than the ship's `NO_OF_FLOORS`.
 - A port stop's dates fall within its trip's `START_DATE`–`END_DATE`.
@@ -440,13 +446,50 @@ dummy data and the API should follow them:
 
 ## Deleting Data
 
-Rows can't be deleted through the app. The app's MySQL user (from `.env`) is
-granted only `SELECT`, `INSERT` and `UPDATE`, so any `DELETE` fails with
-"DELETE command denied". It also can't create, change or drop tables. Foreign
-keys add a second layer: even an admin can't delete a row that other rows still
-reference, such as a trip that has bookings.
+Who can delete what depends on `MYSQL_USER` in `.env`:
 
-To start over during development, rebuild the database with
+- **`root`** (the team default for local demos): the app can do anything,
+  including dropping and altering tables.
+- **A separate user:** the setup script gives it permission to read, add,
+  update and **delete rows** only. It **can't create, alter, drop or truncate
+  tables**, so the schema can only change through `sql/schema.sql` and the
+  setup script.
+
+Either way, the foreign key rules below decide what deleting a row does.
+
+When a row is deleted, each foreign key pointing at it follows one of two rules:
+
+- **Cascade**: the rows pointing at it are deleted too.
+- **Block**: the delete fails while rows still point at it, with the error
+  "Cannot delete or update a parent row". Remove those rows first.
+
+| Deleting a… | Rows pointing at it | Rule |
+| --- | --- | --- |
+| Group | its customers, its bookings | Block |
+| Customer | their user account | **Cascade** |
+| Customer | their purchased packages (`ADH_PACKAGE_BOOKED`) | Block |
+| Cruise ship | its staterooms, restaurants and ship activities | **Cascade** |
+| Cruise ship | its trips | Block |
+| Stateroom | bookings of it | Block |
+| Trip | its port stops | **Cascade** |
+| Trip | its bookings | Block |
+| Booking | its packages (`ADH_PACKAGE_BOOKED`) | **Cascade** |
+| Booking | its payments (`ADH_TRANSACTION`) | Block |
+| Stateroom type, ship part, activity, port or package | rows that use it | Block |
+
+Cascades stop at a block. For example, deleting a ship whose staterooms are
+booked fails, because the bookings block the staterooms from being deleted.
+In practice:
+
+- **Cancel a booking:** delete its payments first, then the booking. Its
+  packages are removed automatically.
+- **Remove a trip:** delete its bookings first. Its port stops go with it.
+- **Remove a customer:** delete their package purchases first. Their login goes
+  with them.
+- **Retire a lookup entry** (port, package, activity, stateroom type, ship
+  part): only possible once nothing uses it.
+
+To start over during development, rebuild everything with
 `python -m app.database.init_db --reset`.
 
 ## Changes From the Original Oracle Design
@@ -459,12 +502,63 @@ To start over during development, rebuild the database with
 - **No double bookings:** a stateroom can be booked only once per trip.
 - **Required links:** every booking names a stateroom, every trip names a ship,
   and every port stop names a port.
-- **Payment method** is limited to `Credit` or `ACH`.
+- **Payment method** is limited to the six methods the dummy data uses.
+- **Payment dates** can't be earlier than the booking's invoice date (triggers).
+- **Port stop arrival and departure** are `DATETIME`, so stops keep their times.
 - **`STATE` and `ZIPCODE` are optional** for customers and ports outside the US.
 - **Customer `STREET` widened** from 30 to 100 characters.
 - **`STATEROOM_PRICE_PER_NIGHT` widened** from `DECIMAL(5,2)` (max 999.99) to
   `DECIMAL(8,2)` (max 999,999.99).
+- **Delete rules** on every foreign key (see Deleting Data).
 - **More CHECK constraints** for formats and ranges (see each table's Rules).
+- **Case-sensitive code columns:** `STATE`, `GENDER`, `RATE_TYPE` and
+  `PAYMENT_METHOD` use a case-sensitive collation (`utf8mb4_bin`), so their
+  checks only accept the exact values (e.g. `FL`, not `fl`).
 - **Converted to MySQL/MariaDB.** `NUMBER` became `INT`/`SMALLINT`/`DECIMAL`
   and `VARCHAR2` became `VARCHAR`. Column comments are inline. Restaurant
-  opening and closing times are `TIME` instead of `DATE`.
+  opening and closing times are `TIME` instead of `DATE`. The `ALTER TABLE`
+  statements at the end of the Oracle export are folded into each
+  `CREATE TABLE`.
+
+## Dummy Data
+
+[`sql/seed.sql`](../sql/seed.sql) is built from the team's original inserts,
+adapted to this schema:
+
+- **Staterooms** are split into 12 stateroom types and the rooms themselves.
+  Each type has one balcony count. Where the original rooms of a type
+  differed, the most common count was used: Balcony Stateroom 1, Junior
+  Suite 2, Grand Presidential Suite 4.
+- **Every ship has staterooms.** Ships 7–20 had none, so each got the five
+  standard rooms (Interior, Oceanview, Balcony, Junior Suite, Grand
+  Presidential): rooms 38–107. Eighteen bookings pointed at a room on a
+  different ship than their trip. Each now uses the same kind of room on the
+  trip's own ship, at the same price.
+- **Ship floor counts** were raised to 11 for Coral Diamond, Badoop Bee,
+  Flummox, Folderol and Whippersnapper, which had activities on higher floors.
+- **Payments:** two payments dated before their booking's invoice now fall on
+  the invoice date, and eleven overpayments were reduced to what the booking
+  owes. Payments after a trip has ended were kept.
+- **Payment methods** kept their original values.
+- **Times:** restaurant opening and closing times are plain times, and port
+  stops keep their arrival and departure times.
+- **Login accounts** were added for the 23 adult customers, plus one admin.
+  Customers under 18 have no login. Usernames and the demo passwords are in
+  the [README](../README.md#demo-logins).
+
+[`sql/counts.sql`](../sql/counts.sql) shows each table's row count. A fresh load has:
+
+| Table | Rows | | Table | Rows |
+| --- | ---: | --- | --- | ---: |
+| `ADH_GROUP` | 15 | | `ADH_RESTAURANT` | 60 |
+| `ADH_CUSTOMER` | 25 | | `ADH_PORT` | 23 |
+| `ADH_USER_ACCOUNT` | 24 | | `ADH_TRIP` | 15 |
+| `ADH_CRUISE_SHIP` | 20 | | `ADH_PORT_STOP` | 59 |
+| `ADH_CRUISE_SHIP_PART` | 4 | | `ADH_PACKAGE` | 15 |
+| `ADH_STATEROOM_TYPE` | 12 | | `ADH_BOOKING` | 30 |
+| `ADH_STATEROOM` | 107 | | `ADH_PACKAGE_BOOKED` | 30 |
+| `ADH_ACTIVITY` | 13 | | `ADH_TRANSACTION` | 25 |
+| `ADH_SHIP_ACTIVITY` | 199 | | | |
+
+Of the 30 bookings, 11 are paid in full, 9 are partly paid and 10 have no
+payments yet.

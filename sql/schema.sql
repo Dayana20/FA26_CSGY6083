@@ -1,31 +1,12 @@
 -- Cruise Trip Booking schema for MySQL 8 / MariaDB 10.4+ (XAMPP).
 --
--- Converted from the Oracle SQL Developer Data Modeler export (2026-11-04), with:
---   * ADH_STATEROOM_TYPE added: size, beds, bathrooms and balconies now live on
---     the type, and each stateroom references its type.
---   * Additional CHECK constraints for formats (email, phone, state, zip) and
---     ranges (positive counts, non-negative money, end dates after start dates).
---   * ADH_USER_ACCOUNT added for app logins (passwords stored only as hashes).
---   * A stateroom can be booked only once per trip; every booking, trip and
---     port stop must name its stateroom, ship and port.
---   * Customer STATE and ZIPCODE are optional; customer STREET widened to 100.
---   * ADH_PORT.STATE and ZIPCODE are optional (ports outside the US have
---     neither); ADH_BOOKING.STATEROOM_PRICE_PER_NIGHT widened to DECIMAL(8,2).
---   * Code columns (STATE, GENDER, RATE_TYPE, PAYMENT_METHOD) use a case-sensitive collation so
---     their checks only accept uppercase.
---   * Oracle-only syntax replaced: NUMBER -> INT/SMALLINT/DECIMAL,
---     VARCHAR2 -> VARCHAR, COMMENT ON COLUMN -> inline COMMENT, restaurant
---     opening/closing times DATE -> TIME.
---   * The ALTER TABLE statements at the end of the original folded into the
---     CREATE TABLE statements.
---
--- Rows can't be deleted through the app: its MySQL user is only granted
--- SELECT, INSERT and UPDATE (see app/database/init_db.py), and foreign keys
--- block deleting any row other rows still reference.
---
+-- Load with the setup script: python -m app.database.init_db  (--reset to rebuild)
 -- Tables are created parents first so every FOREIGN KEY target already exists.
--- Run through the setup script: python -m app.database.init_db
--- See docs/database.md for a description of every table and column.
+-- Triggers for rules that span two tables are at the end of the file.
+--
+-- docs/database.md describes every table, column and rule, what deleting a row
+-- does (ON DELETE CASCADE / RESTRICT), and how this schema changed from the
+-- original Oracle design.
 
 
 -- ---------------------------------------------------------------------------
@@ -54,7 +35,7 @@ CREATE TABLE ADH_CUSTOMER (
     GROUP_ID    INT          NOT NULL COMMENT 'Group ID',
     CONSTRAINT ADH_CUSTOMER_PK PRIMARY KEY (CUSTOMER_ID),
     CONSTRAINT ADH_CUSTOMER_GROUP_FK FOREIGN KEY (GROUP_ID)
-        REFERENCES ADH_GROUP (GROUP_ID),
+        REFERENCES ADH_GROUP (GROUP_ID) ON DELETE RESTRICT,
     CONSTRAINT C_CUSTOMER_F_NAME CHECK (TRIM(F_NAME) <> ''),
     CONSTRAINT C_CUSTOMER_L_NAME CHECK (TRIM(L_NAME) <> ''),
     CONSTRAINT C_CUSTOMER_DOB CHECK (DOB >= '1900-01-01'),
@@ -78,7 +59,7 @@ CREATE TABLE ADH_USER_ACCOUNT (
     CONSTRAINT ADH_USER_ACCOUNT_USERNAME_UK UNIQUE (USERNAME),
     CONSTRAINT ADH_USER_ACCOUNT_CUSTOMER_UK UNIQUE (CUSTOMER_ID),
     CONSTRAINT ADH_USER_ACCOUNT_CUSTOMER_FK FOREIGN KEY (CUSTOMER_ID)
-        REFERENCES ADH_CUSTOMER (CUSTOMER_ID),
+        REFERENCES ADH_CUSTOMER (CUSTOMER_ID) ON DELETE CASCADE,
     CONSTRAINT C_USER_USERNAME CHECK (USERNAME REGEXP '^[A-Za-z0-9_.-]{3,30}$'),
     CONSTRAINT C_USER_PASSWORD_HASH CHECK (CHAR_LENGTH(PASSWORD_HASH) >= 60),
     CONSTRAINT C_USER_ROLE CHECK (ROLE IN ('CUSTOMER', 'ADMIN')),
@@ -130,11 +111,11 @@ CREATE TABLE ADH_STATEROOM (
     SHIP_ID      INT NOT NULL COMMENT 'Cruise ship id',
     CONSTRAINT ADH_STATEROOM_PK PRIMARY KEY (STATEROOM_ID),
     CONSTRAINT ADH_STATEROOM_TYPE_FK FOREIGN KEY (SR_TYPE_ID)
-        REFERENCES ADH_STATEROOM_TYPE (SR_TYPE_ID),
+        REFERENCES ADH_STATEROOM_TYPE (SR_TYPE_ID) ON DELETE RESTRICT,
     CONSTRAINT ADH_STATEROOM_CS_PART_FK FOREIGN KEY (CS_PART_ID)
-        REFERENCES ADH_CRUISE_SHIP_PART (CS_PART_ID),
+        REFERENCES ADH_CRUISE_SHIP_PART (CS_PART_ID) ON DELETE RESTRICT,
     CONSTRAINT ADH_STATEROOM_CS_FK FOREIGN KEY (SHIP_ID)
-        REFERENCES ADH_CRUISE_SHIP (SHIP_ID)
+        REFERENCES ADH_CRUISE_SHIP (SHIP_ID) ON DELETE CASCADE
 ) COMMENT = 'A bookable room on a ship';
 
 CREATE TABLE ADH_ACTIVITY (
@@ -152,9 +133,9 @@ CREATE TABLE ADH_SHIP_ACTIVITY (
     ACTIVITY_ID INT      NOT NULL COMMENT 'Activity ID',
     CONSTRAINT ADH_SHIP_ACTIVITY_PK PRIMARY KEY (SHIP_ID, ACTIVITY_ID, FLOOR),
     CONSTRAINT ADH_SHIP_ACTIVITY_CS_FK FOREIGN KEY (SHIP_ID)
-        REFERENCES ADH_CRUISE_SHIP (SHIP_ID),
+        REFERENCES ADH_CRUISE_SHIP (SHIP_ID) ON DELETE CASCADE,
     CONSTRAINT ADH_SHIP_ACTIVITY_FK FOREIGN KEY (ACTIVITY_ID)
-        REFERENCES ADH_ACTIVITY (ACTIVITY_ID),
+        REFERENCES ADH_ACTIVITY (ACTIVITY_ID) ON DELETE RESTRICT,
     CONSTRAINT C_SHIP_ACTIVITY_FLOOR CHECK (FLOOR BETWEEN 1 AND 99),
     CONSTRAINT C_SHIP_ACTIVITY_UNITS CHECK (NO_UNITS BETWEEN 1 AND 99)
 ) COMMENT = 'Which activities a ship has, on which floor, and how many';
@@ -169,7 +150,7 @@ CREATE TABLE ADH_RESTAURANT (
     SHIP_ID         INT         NOT NULL COMMENT 'Cruise ship id',
     CONSTRAINT ADH_RESTAURANT_PK PRIMARY KEY (RESTAURANT_ID),
     CONSTRAINT ADH_RESTAURANT_CS_FK FOREIGN KEY (SHIP_ID)
-        REFERENCES ADH_CRUISE_SHIP (SHIP_ID),
+        REFERENCES ADH_CRUISE_SHIP (SHIP_ID) ON DELETE CASCADE,
     CONSTRAINT C_RESTAURANT_NAME CHECK (TRIM(RESTAURANT_NAME) <> ''),
     CONSTRAINT C_RESTAURANT_MEAL_TYPE CHECK (TRIM(MEAL_TYPE) <> ''),
     CONSTRAINT C_RESTAURANT_HOURS CHECK (OPEN_TIME <> CLOSING_TIME),
@@ -205,21 +186,21 @@ CREATE TABLE ADH_TRIP (
     SHIP_ID    INT  NOT NULL COMMENT 'Cruise ship id',
     CONSTRAINT ADH_TRIP_PK PRIMARY KEY (TRIP_ID),
     CONSTRAINT ADH_TRIP_CS_FK FOREIGN KEY (SHIP_ID)
-        REFERENCES ADH_CRUISE_SHIP (SHIP_ID),
+        REFERENCES ADH_CRUISE_SHIP (SHIP_ID) ON DELETE RESTRICT,
     CONSTRAINT C_TRIP_DATES CHECK (END_DATE > START_DATE)
 ) COMMENT = 'A cruise: one ship sailing between two dates';
 
 CREATE TABLE ADH_PORT_STOP (
     STOP_NO     SMALLINT NOT NULL COMMENT 'Order of stop in trip',
-    PSTART_DATE DATE     NOT NULL COMMENT 'Port start date',
-    PEND_DATE   DATE     NOT NULL COMMENT 'Port end date',
+    PSTART_DATE DATETIME NOT NULL COMMENT 'Arrival at the port (date and time)',
+    PEND_DATE   DATETIME NOT NULL COMMENT 'Departure from the port (date and time)',
     TRIP_ID     INT      NOT NULL COMMENT 'trip id',
     PORT_ID     INT      NOT NULL COMMENT 'port id',
     CONSTRAINT ADH_PORT_STOP_PK PRIMARY KEY (STOP_NO, TRIP_ID),
     CONSTRAINT ADH_PORT_STOP_TRIP_FK FOREIGN KEY (TRIP_ID)
-        REFERENCES ADH_TRIP (TRIP_ID),
+        REFERENCES ADH_TRIP (TRIP_ID) ON DELETE CASCADE,
     CONSTRAINT ADH_PORT_STOP_PORT_FK FOREIGN KEY (PORT_ID)
-        REFERENCES ADH_PORT (PORT_ID),
+        REFERENCES ADH_PORT (PORT_ID) ON DELETE RESTRICT,
     CONSTRAINT C_PORT_STOP_NO CHECK (STOP_NO >= 1),
     CONSTRAINT C_PORT_STOP_DATES CHECK (PEND_DATE >= PSTART_DATE)
 ) COMMENT = 'One stop on a trip itinerary, in order';
@@ -250,11 +231,11 @@ CREATE TABLE ADH_BOOKING (
     STATEROOM_ID              INT          NOT NULL COMMENT 'Stateroom ID',
     CONSTRAINT ADH_BOOKING_PK PRIMARY KEY (BOOKING_ID),
     CONSTRAINT ADH_BOOKING_GROUP_FK FOREIGN KEY (GROUP_ID)
-        REFERENCES ADH_GROUP (GROUP_ID),
+        REFERENCES ADH_GROUP (GROUP_ID) ON DELETE RESTRICT,
     CONSTRAINT ADH_BOOKING_TRIP_FK FOREIGN KEY (TRIP_ID)
-        REFERENCES ADH_TRIP (TRIP_ID),
+        REFERENCES ADH_TRIP (TRIP_ID) ON DELETE RESTRICT,
     CONSTRAINT ADH_BOOKING_STATEROOM_FK FOREIGN KEY (STATEROOM_ID)
-        REFERENCES ADH_STATEROOM (STATEROOM_ID),
+        REFERENCES ADH_STATEROOM (STATEROOM_ID) ON DELETE RESTRICT,
     CONSTRAINT ADH_BOOKING_TRIP_STATEROOM_UK UNIQUE (TRIP_ID, STATEROOM_ID),
     CONSTRAINT C_BOOKING_PRICE CHECK (STATEROOM_PRICE_PER_NIGHT > 0)
 ) COMMENT = 'A group''s reservation of a stateroom on a trip; also the invoice';
@@ -265,22 +246,71 @@ CREATE TABLE ADH_PACKAGE_BOOKED (
     PACKAGE_ID  INT NOT NULL COMMENT 'Package ID',
     CONSTRAINT ADH_PACKAGE_BOOKED_PK PRIMARY KEY (BOOKING_ID, CUSTOMER_ID, PACKAGE_ID),
     CONSTRAINT ADH_PACKAGE_BOOKING_FK FOREIGN KEY (BOOKING_ID)
-        REFERENCES ADH_BOOKING (BOOKING_ID),
+        REFERENCES ADH_BOOKING (BOOKING_ID) ON DELETE CASCADE,
     CONSTRAINT ADH_PACKAGE_CUSTOMER_FK FOREIGN KEY (CUSTOMER_ID)
-        REFERENCES ADH_CUSTOMER (CUSTOMER_ID),
+        REFERENCES ADH_CUSTOMER (CUSTOMER_ID) ON DELETE RESTRICT,
     CONSTRAINT ADH_PACKAGE_BOOKED_FK FOREIGN KEY (PACKAGE_ID)
-        REFERENCES ADH_PACKAGE (PACKAGE_ID)
+        REFERENCES ADH_PACKAGE (PACKAGE_ID) ON DELETE RESTRICT
 ) COMMENT = 'Which customer on a booking bought which package';
 
 CREATE TABLE ADH_TRANSACTION (
     TRANSACTION_ID INT           NOT NULL AUTO_INCREMENT COMMENT 'Transaction ID',
     PAYMENT_DATE   DATE          NOT NULL COMMENT 'Payment date',
     PAYMENT_AMOUNT DECIMAL(9,2)  NOT NULL DEFAULT 0 COMMENT 'Payment amount',
-    PAYMENT_METHOD VARCHAR(30)   COLLATE utf8mb4_bin NOT NULL COMMENT 'Payment method: Credit or ACH',
+    PAYMENT_METHOD VARCHAR(30)   COLLATE utf8mb4_bin NOT NULL COMMENT 'Payment method: Credit Card, Debit Card, Apple Pay, PayPal, Gift Card or Bank Transfer',
     BOOKING_ID     INT           NOT NULL COMMENT 'Booking ID',
     CONSTRAINT ADH_TRANSACTION_PK PRIMARY KEY (TRANSACTION_ID),
     CONSTRAINT ADH_TRANSACTION_BOOKING_FK FOREIGN KEY (BOOKING_ID)
-        REFERENCES ADH_BOOKING (BOOKING_ID),
+        REFERENCES ADH_BOOKING (BOOKING_ID) ON DELETE RESTRICT,
     CONSTRAINT C_TRANSACTION_AMOUNT CHECK (PAYMENT_AMOUNT >= 0),
-    CONSTRAINT C_TRANSACTION_METHOD CHECK (PAYMENT_METHOD IN ('Credit', 'ACH'))
+    CONSTRAINT C_TRANSACTION_METHOD CHECK (PAYMENT_METHOD IN ('Credit Card', 'Debit Card', 'Apple Pay', 'PayPal', 'Gift Card', 'Bank Transfer'))
 ) COMMENT = 'A payment toward a booking; a booking can be paid in several parts';
+
+
+-- ---------------------------------------------------------------------------
+-- Triggers: rules that compare rows in two tables
+-- ---------------------------------------------------------------------------
+-- CHECK constraints can only see one row, so these rules use triggers. The
+-- DELIMITER lines let each trigger body contain semicolons; the setup script
+-- and MySQL Workbench both understand them.
+
+DELIMITER //
+
+-- A payment can't be dated before its booking's invoice date (it may be after
+-- the trip ends).
+CREATE TRIGGER ADH_TRANSACTION_DATE_BI
+BEFORE INSERT ON ADH_TRANSACTION
+FOR EACH ROW
+BEGIN
+    IF NEW.PAYMENT_DATE < (SELECT INVOICE_DATE FROM ADH_BOOKING
+                           WHERE BOOKING_ID = NEW.BOOKING_ID) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'PAYMENT_DATE can''t be before the booking''s INVOICE_DATE';
+    END IF;
+END//
+
+CREATE TRIGGER ADH_TRANSACTION_DATE_BU
+BEFORE UPDATE ON ADH_TRANSACTION
+FOR EACH ROW
+BEGIN
+    IF NEW.PAYMENT_DATE < (SELECT INVOICE_DATE FROM ADH_BOOKING
+                           WHERE BOOKING_ID = NEW.BOOKING_ID) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'PAYMENT_DATE can''t be before the booking''s INVOICE_DATE';
+    END IF;
+END//
+
+-- Moving a booking's invoice date later than a payment already made on it
+-- would break the same rule.
+CREATE TRIGGER ADH_BOOKING_INVOICE_DATE_BU
+BEFORE UPDATE ON ADH_BOOKING
+FOR EACH ROW
+BEGIN
+    IF NEW.INVOICE_DATE > (SELECT MIN(PAYMENT_DATE) FROM ADH_TRANSACTION
+                           WHERE BOOKING_ID = NEW.BOOKING_ID) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'INVOICE_DATE can''t be after a payment already made on this booking';
+    END IF;
+END//
+
+DELIMITER ;

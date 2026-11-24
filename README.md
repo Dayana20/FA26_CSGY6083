@@ -44,8 +44,8 @@ Then open `.env` and fill it in:
 | --------------------- | --------------------------------------------------------------------------- |
 | `MYSQL_ROOT_USER`     | `root` (XAMPP's default admin).                                             |
 | `MYSQL_ROOT_PASSWORD` | Leave blank. XAMPP's root has no password unless you set one yourself.      |
-| `MYSQL_USER`          | Any username you like for the app. The setup script creates it.             |
-| `MYSQL_PASSWORD`      | Any password you like for that user.                                        |
+| `MYSQL_USER`          | `root` for local demos (the team default). Or any other name, and the setup script creates that user with no permission to drop or alter tables. |
+| `MYSQL_PASSWORD`      | Blank when `MYSQL_USER` is `root`. Otherwise any password for that user.     |
 | `MYSQL_DATABASE`      | Keep `da2410hc4288as23663`.                                                 |
 
 `MYSQL_HOST` and `MYSQL_PORT` default to `127.0.0.1:3306`, which is what XAMPP
@@ -59,8 +59,10 @@ python -m app.database.init_db
 
 This connects as root and:
 
-1. creates the database and your app user. The app user can read, add and
-   update rows but can't delete them (see [Deleting Data](docs/database.md#deleting-data)),
+1. creates the database. If `MYSQL_USER` is a separate user rather than
+   `root`, it also creates that user with permission to read, add, update and
+   delete rows but not to change or drop tables (see
+   [Deleting Data](docs/database.md#deleting-data)),
 2. creates the tables from `sql/schema.sql`,
 3. loads the dummy data from `sql/seed.sql`.
 
@@ -92,7 +94,22 @@ Then open <http://127.0.0.1:8000/health/mysql>. You should see
   manages the database (it skips them if they're there).
 - Order matters: create and fill parent tables before the tables that reference
   them with foreign keys.
+- Triggers (or anything else whose body contains `;`) go between
+  `DELIMITER //` and `DELIMITER ;` lines, as at the end of `sql/schema.sql`.
 - After editing either file, run `python -m app.database.init_db --reset`.
+- To check row counts (e.g. for screenshots), run `sql/counts.sql` in MySQL
+  Workbench.
+
+## Demo Logins
+
+The dummy data includes login accounts. Passwords are stored as bcrypt hashes.
+
+| Who | Username | Password |
+| --- | --- | --- |
+| Any adult customer | `first.last`, e.g. `maria.gonzalez`, `liam.obrien` | `CruiseDemo2026!` |
+| Admin | `admin` | `AdminDemo2026!` |
+
+These are for the local demo only. Customers under 18 have no login.
 
 ## Troubleshooting
 
@@ -101,6 +118,7 @@ Then open <http://127.0.0.1:8000/health/mysql>. You should see
 | `Can't reach MySQL at 127.0.0.1:3306`    | Start MySQL in the XAMPP Control Panel.                                             |
 | `MySQL rejected the admin login for 'root'` | You've set a root password in XAMPP. Put it in `MYSQL_ROOT_PASSWORD`.            |
 | `No .env file found`                     | Do step 3.                                                                          |
+| `Note: MYSQL_USER is the admin user 'root'` | Expected with the team default. The app can drop and alter tables when it logs in as root. Use a separate `MYSQL_USER` if you want that blocked. |
 | `sql/seed.sql, statement N failed: ...`  | Fix that statement (the error shows it), then run with `--reset`. A failed seed is rolled back, so no partial data is left. |
 
 ## API Endpoints

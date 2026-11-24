@@ -6,9 +6,11 @@ Start the development server from the project root with:
 
 The API documentation is then at http://127.0.0.1:8000/docs.
 """
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 
@@ -20,3 +22,8 @@ load_dotenv()
 # (see app/api/router.py for the list).
 app = FastAPI()
 app.include_router(api_router)
+app.mount(
+    "/static",
+    StaticFiles(directory=Path(__file__).resolve().parent / "app" / "static"),
+    name="static",
+)

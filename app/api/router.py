@@ -7,7 +7,6 @@ its router here, and include it below.
 from fastapi import APIRouter
 from app.api.routes.health import router as health_router
 from app.api.routes.home import router as home_router
-from app.api.routes.mysql_health import router as mysql_health_router
 
 # The router main.py registers with the app.
 api_router = APIRouter()

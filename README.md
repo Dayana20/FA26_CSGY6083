@@ -2,9 +2,9 @@
 
 ## Team Members
 
-- `da2410`
-- `hc4288`
-- `as23663`
+- `da2410 - Dayana Alejandro`
+- `hc4288 - Hoi Cheng`
+- `as23663 - Ahana Shaikh`
 
 ## Database Design
 
@@ -126,3 +126,12 @@ These are for the local demo only. Customers under 18 have no login.
 - Interactive API documentation: <http://127.0.0.1:8000/docs>
 - `GET /health`: confirms the API is running.
 - `GET /health/mysql`: confirms the API can reach the database.
+
+## Application Pages
+
+| Route | Page |
+| --- | --- |
+| `/` | Public home page |
+| `/dashboard` | Regular-user dashboard |
+| `/admin/dashboard` | Admin dashboard |
+| `/admin/cruise-trips` | Admin cruise-trip management prototype |

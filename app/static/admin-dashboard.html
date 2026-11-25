@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#155eef" />
+    <title>Admin Dashboard | ADH Cruises</title>
+    <link rel="stylesheet" href="../static/styles.css?v=2" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="ADH Cruises home">ADH Cruises</a>
+      <nav class="navigation" aria-label="Main navigation">
+        <a class="nav-link" href="/dashboard">User dashboard</a>
+        <a class="button button-light" href="/">Sign Out</a>
+      </nav>
+    </header>
+
+    <main class="dashboard">
+      <section class="dashboard-heading">
+        <br>
+        <h1>Admin dashboard</h1>
+      </section>
+
+      <section class="dashboard-section">
+        <div class="admin-grid">
+          <a class="admin-card admin-card-link" href="/admin/cruise-trips">
+            <h2>Manage cruise trips</h2>
+            <span class="card-action">View and manage trips <span aria-hidden="true">&rarr;</span></span>
+          </a>
+          <article class="admin-card">
+            <h2>Manage bookings</h2>
+          </article>
+          <article class="admin-card">
+            <h2>Manage customers</h2>
+          </article>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>

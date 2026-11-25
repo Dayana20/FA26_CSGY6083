@@ -4,13 +4,25 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
 router = APIRouter()
-HOME_PAGE = (
-    Path(__file__).resolve().parent.parent.parent
-    / "static"
-    / "index.html"
-)
+STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
-# keeping this route at root so it wont be added to swagger docs
+
+# These are page routes rather than API endpoints, so keep them out of Swagger.
 @router.get("/", include_in_schema=False)
-def home_page():
-    return FileResponse(HOME_PAGE)
+def home_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@router.get("/dashboard", include_in_schema=False)
+def user_dashboard() -> FileResponse:
+    return FileResponse(STATIC_DIR / "dashboard.html")
+
+
+@router.get("/admin/dashboard", include_in_schema=False)
+def admin_dashboard() -> FileResponse:
+    return FileResponse(STATIC_DIR / "admin-dashboard.html")
+
+
+@router.get("/admin/cruise-trips", include_in_schema=False)
+def admin_cruise_trips() -> FileResponse:
+    return FileResponse(STATIC_DIR / "admin-cruise-trips.html")

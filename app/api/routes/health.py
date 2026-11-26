@@ -14,10 +14,7 @@ router = APIRouter(
 
 @router.get("")
 def health_check() -> dict[str, str]:
-    """Confirm the API is running.
-
-    Doesn't touch the database. Always returns {"status": "ok"}.
-    """
+    """Confirm the API is running."""
     return {
         "status": "ok"
     }

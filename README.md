@@ -127,6 +127,23 @@ These are for the local demo only. Customers under 18 have no login.
 - `GET /health`: confirms the API is running.
 - `GET /health/mysql`: confirms the API can reach the database.
 
+### Cruise ships
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/create_cruise` | Creates a ship. JSON body: `ship_name`, `no_of_floors`; MySQL generates `ship_id`. |
+| `GET` | `/get_cruises` | Returns all ships with `SHIP_ID`, `SHIP_NAME`, and `NO_OF_FLOORS`. |
+| `DELETE` | `/delete_cruise/{ship_id}` | Deletes a ship by ID. A ship referenced by a trip cannot be deleted. |
+
+### Trips
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/create_trip` | Creates a trip. JSON body: `start_date`, `end_date`, `ship_id`; MySQL generates `trip_id`. The end date must be after the start date, and the ship must exist. |
+| `GET` | `/current_trips` | Returns all trips with `TRIP_ID`, `START_DATE`, `END_DATE`, and `SHIP_ID`. |
+| `DELETE` | `/delete_trip/{trip_id}` | Deletes a trip by ID. |
+
+
 ## Application Pages
 
 | Route | Page |

@@ -5,6 +5,9 @@ its router here, and include it below.
 """
 
 from fastapi import APIRouter
+from app.api.routes.account import router as account_router
+from app.api.routes.auth import router as auth_router
+from app.api.routes.employee import router as employee_router
 from app.api.routes.health import router as health_router
 from app.api.routes.home import router as home_router
 from app.api.routes.create_trip import router as trips_router
@@ -19,6 +22,9 @@ api_router = APIRouter()
 
 # Register page routes, health checks, and trip API routes.
 api_router.include_router(home_router)
+api_router.include_router(auth_router)
+api_router.include_router(account_router)
+api_router.include_router(employee_router)
 api_router.include_router(health_router)
 
 api_router.include_router(trips_router)

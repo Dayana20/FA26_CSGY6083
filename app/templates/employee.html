@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Portal | ADH Cruises{% endblock %}
+
+{% block content %}
+<main class="auth-page">
+  <section class="auth-card" aria-labelledby="employee-heading">
+    <h1 id="employee-heading" class="auth-title">Employee Portal</h1>
+    <p class="auth-subtitle">
+      Authenticated staff access for {{ current_user.email }} (Role: {{ current_user.role }}).
+    </p>
+
+    <dl class="profile-list">
+      <div class="profile-item">
+        <dt>User ID</dt>
+        <dd>{{ current_user.user_id }}</dd>
+      </div>
+      <div class="profile-item">
+        <dt>Email</dt>
+        <dd>{{ current_user.email }}</dd>
+      </div>
+      <div class="profile-item">
+        <dt>Role</dt>
+        <dd>Employee ({{ current_user.role }})</dd>
+      </div>
+    </dl>
+  </section>
+</main>
+{% endblock %}

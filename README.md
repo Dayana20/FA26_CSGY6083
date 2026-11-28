@@ -47,6 +47,7 @@ Then open `.env` and fill it in:
 | `MYSQL_USER`          | `root` for local demos (the team default). Or any other name, and the setup script creates that user with no permission to drop or alter tables. |
 | `MYSQL_PASSWORD`      | Blank when `MYSQL_USER` is `root`. Otherwise any password for that user.     |
 | `MYSQL_DATABASE`      | Keep `da2410hc4288as23663`.                                                 |
+| `SESSION_SECRET_KEY`  | A long random value. It signs the login session cookie.                     |
 
 `MYSQL_HOST` and `MYSQL_PORT` default to `127.0.0.1:3306`, which is what XAMPP
 uses. `.env` is ignored by git, so your passwords stay on your machine.
@@ -87,6 +88,13 @@ uvicorn main:app --reload
 Then open <http://127.0.0.1:8000/health/mysql>. You should see
 `{"status": "ok", "database": "da2410hc4288as23663"}`.
 
+## Run Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest -v
+```
+
 ## Changing the Schema or Dummy Data
 
 - Table definitions go in `sql/schema.sql` and inserts go in `sql/seed.sql`.
@@ -124,6 +132,11 @@ These are for the local demo only. Customers under 18 have no login.
 ## API Endpoints
 
 - Interactive API documentation: <http://127.0.0.1:8000/docs>
+- Registration page: <http://127.0.0.1:8000/register>
+- Login page: <http://127.0.0.1:8000/login>
+- Customer account page (customers only): <http://127.0.0.1:8000/account>
+- Employee portal (employees only): <http://127.0.0.1:8000/employee>
+- `GET /auth/me`: returns the signed-in user, without the password hash.
 - `GET /health`: confirms the API is running.
 - `GET /health/mysql`: confirms the API can reach the database.
 

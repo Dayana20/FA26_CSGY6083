@@ -54,6 +54,7 @@ body {
 .site-header .navigation .button-light {
   border-color: rgb(255 255 255 / 65%);
   background: transparent;
+  color: #ffffff;
 }
 
 .site-header .navigation .button-light:hover {

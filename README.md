@@ -226,7 +226,7 @@ These are for the local demo only. Customers under 18 have no login.
 | `POST` | `/create_trip` | Creates a trip. JSON body: `start_date`, `end_date`, `ship_id`; MySQL generates `trip_id`. Optionally include `port_stops` with `stop_no`, `port_id`, `pstart_date`, and `pend_date`. Trip and stops are saved in one transaction. Stops must be numbered from 1, within the trip dates, have departure after arrival, and follow the previous stop. Date-times must omit time zones and fractional seconds. |
 | `GET` | `/current_trips` | Returns all trips with `TRIP_ID`, `START_DATE`, `END_DATE`, and `SHIP_ID`. |
 | `GET` | `/available_trips` | Returns trips starting today or later, soonest first, each with `TRIP_ID`, `START_DATE`, `END_DATE`, `NIGHTS`, `SHIP_ID`, `SHIP_NAME` and `PORT_STOPS` (in order, with port name, city, country, arrival and departure). Returns an empty list when nothing is scheduled. Used by the Book a cruise page. |
-| `DELETE` | `/delete_trip/{trip_id}` | Deletes a trip by ID. |
+| `DELETE` | `/delete_trip/{trip_id}` | Deletes a trip by ID, along with its port stops. |
 
 
 ## Application Pages

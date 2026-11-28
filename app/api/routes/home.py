@@ -13,6 +13,11 @@ def home_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@router.get("/book-cruise", include_in_schema=False)
+def book_cruise_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "book-cruise.html")
+
+
 @router.get("/dashboard", include_in_schema=False)
 def user_dashboard() -> FileResponse:
     return FileResponse(STATIC_DIR / "dashboard.html")

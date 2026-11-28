@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#155eef" />
+    <title>Book a Cruise | ADH Cruises</title>
+    <link rel="stylesheet" href="../static/styles.css?v=5" />
+    <script src="../static/book-cruise.js?v=1" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="ADH Cruises home">ADH Cruises</a>
+      <nav class="navigation" aria-label="Main navigation">
+        <a class="nav-link" href="/book-cruise">Book a cruise</a>
+        <button class="button button-outline" type="button">Login / Sign Up</button>
+      </nav>
+    </header>
+
+    <main class="dashboard">
+      <a class="back-link" href="/">&larr; Back to home</a>
+      <section class="dashboard-heading">
+        <p class="section-label">BOOK A CRUISE</p>
+        <h1>Upcoming cruises</h1>
+        <p class="page-description">
+          Every trip departing today or later. Log in to book once booking opens.
+        </p>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="available-trips-heading">
+        <div class="section-heading">
+          <h2 id="available-trips-heading">Available trips</h2>
+          <span id="trip-count" class="trip-count"></span>
+        </div>
+        <p id="trip-message" class="trip-message" role="status" aria-live="polite">
+          Loading trips…
+        </p>
+        <div class="trip-list" id="trip-list"></div>
+      </section>
+    </main>
+  </body>
+</html>

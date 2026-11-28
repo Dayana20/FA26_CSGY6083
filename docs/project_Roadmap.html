@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project Roadmap</title>
+<!--
+  Project roadmap for the CSGY6083 project.
+
+  Open this file in a browser (double-click it). No server or internet needed.
+
+  TO UPDATE THE CHART, edit only the DATA section in the <script> below:
+    * NODES: one entry per box. Change `status` ("built", "revising" or
+      "notbuilt") or `owner` as work progresses. To add a box, copy a similar
+      entry, give it a new `id`, and pick a `y` (top edge, in pixels) that
+      doesn't overlap its neighbours in the same column.
+    * EDGES: one entry per arrow, from one box `id` to another. Arrows touching
+      a "notbuilt" box are drawn dashed automatically. `label` is optional.
+  Everything else (drawing, colours, tags, the key) is handled for you.
+-->
+<style>
+  :root {
+    --bg: #0b1120;
+    --panel: #111a2e;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --line: #cbd5e1;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { padding: 24px 32px 12px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: -0.01em; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    padding: 0 32px 12px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .pill {
+    display: inline-block;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid;
+    font-size: 12px;
+    line-height: 20px;
+  }
+  .swatch { width: 26px; height: 14px; border-radius: 4px; border: 1.5px solid #64748b; }
+  .swatch.notbuilt { border-style: dashed; }
+  .line { width: 30px; height: 0; border-top: 2px solid var(--line); }
+  .line.dashed { border-top-style: dashed; }
+  #stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    margin: 4px 32px 24px;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  #stage.panning { cursor: grabbing; }
+  #chart { display: block; width: 100%; height: 100%; }
+  .zoom {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .zoom button {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .zoom button:hover { background: #1e293b; }
+  .node, .edge { transition: opacity 0.15s; }
+  svg.dimmed .node:not(.hot), svg.dimmed .edge:not(.hot) { opacity: 0.18; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Project Roadmap</h1>
+</header>
+<div class="legend" id="legend"></div>
+<div id="stage">
+  <svg id="chart" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="zoom">
+    <button type="button" id="zoom-in" title="Zoom in (+)">+</button>
+    <button type="button" id="zoom-out" title="Zoom out (-)">&minus;</button>
+    <button type="button" id="zoom-reset" title="Show the whole chart (0)">&#x27F2;</button>
+  </div>
+</div>
+
+<script>
+// =============================================================================
+// DATA: edit this section to update the chart
+// =============================================================================
+
+// Columns, left to right. `x` and `w` are in pixels.
+const COLUMNS = [
+  { id: "users",   title: "1 · Users",                         x: 0,    w: 200, color: "#a78bfa" },
+  { id: "shell",   title: "2 · Shell: web pages (app/static)", x: 300,  w: 320, color: "#60a5fa" },
+  { id: "api",     title: "3 · API: Python (FastAPI)",         x: 720,  w: 380, color: "#34d399" },
+  { id: "queries", title: "4 · Database queries (SQL)",        x: 1200, w: 380, color: "#fbbf24" },
+  // The database column has three lanes of tables; `lane` picks one.
+  { id: "db",      title: "5 · Database: MySQL on XAMPP",      x: 1680, w: 880, color: "#fb923c",
+    lanes: [1704, 2014, 2324], laneW: 210 },
+];
+
+// Boxes. status: "built" | "revising" | "notbuilt". owner: a name, or "" for none.
+// `title` is the bold first line; `lines` are the rest (`backticks` = code).
+// `h` is the box height; it grows automatically if the text needs more room.
+// `small: true` uses a smaller font for wordier boxes.
+const NODES = [
+  // ---- Users ----
+  { id: "customer", col: "users", y: 40,  h: 150, kind: "person", title: "Customer" },
+  { id: "admin",    col: "users", y: 573, h: 150, kind: "person", title: "Admin" },
+
+  // ---- Shell ----
+  { id: "home", col: "shell", y: 24, h: 96, status: "built", owner: "Dayana",
+    title: "Home page · `/`", lines: ["Login / Sign Up button not wired yet"] },
+  { id: "bookCruise", col: "shell", y: 184, h: 96, status: "revising", owner: "Hoi",
+    title: "Book a cruise · `/book-cruise`", lines: ["Lists upcoming trips that admins create"] },
+  { id: "myDashboard", col: "shell", y: 480, h: 88, status: "built", owner: "Dayana",
+    title: "My dashboard · `/dashboard`", lines: ["Your trips: static for now"] },
+  { id: "adminDashboard", col: "shell", y: 592, h: 112, status: "built", owner: "Dayana",
+    title: "Admin dashboard", lines: ["`/admin/dashboard`", "Manage bookings, cruise trips, customers"] },
+  { id: "manageTrips", col: "shell", y: 768, h: 112, status: "built", owner: "Dayana",
+    title: "Manage cruise trips", lines: ["`/admin/cruise-trips`", "Prototype: not yet wired to the trip endpoints"] },
+  { id: "login", col: "shell", y: 1062, h: 96, status: "notbuilt", owner: "Ahana",
+    title: "Login / sign up", lines: ["Reached from Book a cruise; leads to My dashboard"] },
+
+  // ---- API ----
+  { id: "pageRoutes", col: "api", y: 24, h: 72, status: "built", owner: "Dayana",
+    title: "Page routes · home.py", lines: ["Serve the HTML pages"] },
+  { id: "healthApi", col: "api", y: 120, h: 72, status: "built", owner: "Dayana",
+    title: "Health checks", lines: ["`GET /health` · `GET /health/mysql`"] },
+  { id: "shipApi", col: "api", y: 216, h: 120, status: "built", owner: "Dayana",
+    title: "Ship endpoints", lines: ["`POST /create_cruise`", "`GET /get_cruises`", "`DELETE /delete_cruise/{id}`"] },
+  { id: "availableApi", col: "api", y: 360, h: 96, status: "built", owner: "Hoi",
+    title: "Available trips", lines: ["`GET /available_trips`", "Upcoming trips with ship and port stops"] },
+  { id: "tripApi", col: "api", y: 480, h: 120, status: "built", owner: "Dayana",
+    title: "Trip endpoints", lines: ["`POST /create_trip`", "`GET /current_trips`", "`DELETE /delete_trip/{id}`"] },
+  { id: "bookTripApi", col: "api", y: 624, h: 96, status: "notbuilt", owner: "Hoi",
+    title: "Book a trip · `POST /book_trip`", lines: ["Trip, room, packages and an optional deposit"] },
+  { id: "myBookingsApi", col: "api", y: 798, h: 96, status: "notbuilt", owner: "Hoi",
+    title: "My bookings · `GET /my_bookings`", lines: ["Every trip booked by the logged-in customer's group"] },
+  { id: "plannedApi", col: "api", y: 942, h: 96, status: "notbuilt", owner: "Unassigned",
+    title: "Planned endpoints", lines: ["Customers, payments"] },
+  { id: "loginApi", col: "api", y: 1062, h: 96, status: "notbuilt", owner: "Ahana",
+    title: "Login / sign up", lines: ["`POST /login` · `POST /signup`"] },
+  { id: "setupApi", col: "api", y: 1182, h: 96, status: "built", owner: "Hoi",
+    title: "Database setup · init_db.py", lines: ["Run once: `python -m app.database.init_db`"] },
+
+  // ---- Database queries ----
+  { id: "healthQuery", col: "queries", y: 120, h: 72, status: "built", owner: "Dayana",
+    title: "Health query", lines: ["`SELECT DATABASE()`"] },
+  { id: "shipQueries", col: "queries", y: 240, h: 72, status: "built", owner: "Dayana",
+    title: "Ship queries", lines: ["`INSERT` · `SELECT` · `DELETE`"] },
+  { id: "upcomingQuery", col: "queries", y: 360, h: 96, status: "built", owner: "Hoi",
+    title: "Upcoming trips query · trips.py", lines: ["`WHERE START_DATE >= CURDATE()`", "Plus each trip's ship and port stops"] },
+  { id: "tripQueries", col: "queries", y: 504, h: 72, status: "built", owner: "Dayana",
+    title: "Trip queries", lines: ["`INSERT` · `SELECT` · `DELETE`"] },
+  { id: "createBooking", col: "queries", y: 624, h: 150, status: "notbuilt", owner: "Hoi", small: true,
+    title: "Create booking · one transaction", lines: [
+      "1. Check trip is upcoming, room is free",
+      "2. Insert ADH_BOOKING",
+      "3. Insert ADH_PACKAGE_BOOKED (each package)",
+      "4. Insert ADH_TRANSACTION (if deposit)",
+      "5. Commit, or roll back on any error"] },
+  { id: "groupBookings", col: "queries", y: 798, h: 120, status: "notbuilt", owner: "Hoi", small: true,
+    title: "Group bookings query", lines: [
+      "1. Find the customer's GROUP_ID in ADH_CUSTOMER",
+      "2. Get that group's rows from ADH_BOOKING",
+      "3. Add each trip, ship, room, packages and payments"] },
+  { id: "plannedQueries", col: "queries", y: 942, h: 96, status: "notbuilt", owner: "Unassigned",
+    title: "Planned queries", lines: ["Customers, payments"] },
+  { id: "loginQueries", col: "queries", y: 1062, h: 130, status: "notbuilt", owner: "Ahana", small: true,
+    title: "Login / sign-up queries", lines: [
+      "Login: find ADH_USER_ACCOUNT by USERNAME, check the bcrypt hash, set LAST_LOGIN_AT",
+      "Sign up: insert ADH_GROUP, ADH_CUSTOMER and ADH_USER_ACCOUNT in one transaction"] },
+  { id: "getConnection", col: "queries", y: 1216, h: 88, status: "built", owner: "Dayana",
+    title: "get_connection() · mysql.py", lines: ["Opens every MySQL connection, using .env"] },
+  { id: "schemaSeed", col: "queries", y: 1328, h: 96, status: "built", owner: "Hoi",
+    title: "Schema + dummy data", lines: ["Runs sql/schema.sql then sql/seed.sql, as root"] },
+
+  // ---- Database tables (lane 0 = left, 1 = middle, 2 = right) ----
+  { id: "ADH_SHIP_ACTIVITY",    col: "db", lane: 0, y: 40,   kind: "table", status: "built" },
+  { id: "ADH_CRUISE_SHIP",      col: "db", lane: 0, y: 240,  kind: "table", status: "built" },
+  { id: "ADH_TRIP",             col: "db", lane: 0, y: 440,  kind: "table", status: "built" },
+  { id: "ADH_BOOKING",          col: "db", lane: 0, y: 680,  kind: "table", status: "built" },
+  { id: "ADH_GROUP",            col: "db", lane: 0, y: 840,  kind: "table", status: "built" },
+  { id: "ADH_CUSTOMER",         col: "db", lane: 0, y: 1000, kind: "table", status: "built" },
+  { id: "ADH_USER_ACCOUNT",     col: "db", lane: 0, y: 1160, kind: "table", status: "built" },
+  { id: "ADH_ACTIVITY",         col: "db", lane: 1, y: 40,   kind: "table", status: "built" },
+  { id: "ADH_RESTAURANT",       col: "db", lane: 1, y: 140,  kind: "table", status: "built" },
+  { id: "ADH_PORT_STOP",        col: "db", lane: 1, y: 440,  kind: "table", status: "built" },
+  { id: "ADH_STATEROOM",        col: "db", lane: 1, y: 560,  kind: "table", status: "built" },
+  { id: "ADH_TRANSACTION",      col: "db", lane: 1, y: 760,  kind: "table", status: "built" },
+  { id: "ADH_PACKAGE_BOOKED",   col: "db", lane: 1, y: 920,  kind: "table", status: "built" },
+  { id: "ADH_PORT",             col: "db", lane: 2, y: 440,  kind: "table", status: "built" },
+  { id: "ADH_STATEROOM_TYPE",   col: "db", lane: 2, y: 504,  kind: "table", status: "built" },
+  { id: "ADH_CRUISE_SHIP_PART", col: "db", lane: 2, y: 656,  kind: "table", status: "built" },
+  { id: "ADH_PACKAGE",          col: "db", lane: 2, y: 920,  kind: "table", status: "built" },
+];
+
+// Arrows. `to` is a box id, or [x, y] for a free end.
+// Optional routing: fromSide/toSide ("left" | "right" | "top" | "bottom"),
+// midX (x of the vertical leg) or midY (y of the horizontal leg).
+// `dashed` is automatic (a "notbuilt" end) unless you set it.
+const EDGES = [
+  // Users -> pages
+  { from: "customer", to: "home" },
+  { from: "admin", to: "adminDashboard" },
+  // Between pages
+  { from: "home", to: "bookCruise", fromSide: "bottom", toSide: "top" },
+  { from: "adminDashboard", to: "manageTrips", fromSide: "bottom", toSide: "top" },
+  // Pages <-> API
+  { from: "pageRoutes", to: [620, 60], fromSide: "left" },
+  { from: "bookCruise", to: "availableApi", midX: 720 },
+  { from: "bookCruise", to: "bookTripApi", midX: 700 },
+  { from: "myDashboard", to: "myBookingsApi", midX: 650 },
+  { from: "login", to: "loginApi" },
+  // API -> queries
+  { from: "healthApi", to: "healthQuery" },
+  { from: "shipApi", to: "shipQueries" },
+  { from: "availableApi", to: "upcomingQuery" },
+  { from: "tripApi", to: "tripQueries" },
+  { from: "bookTripApi", to: "createBooking" },
+  { from: "myBookingsApi", to: "groupBookings" },
+  { from: "plannedApi", to: "plannedQueries" },
+  { from: "loginApi", to: "loginQueries" },
+  { from: "setupApi", to: "schemaSeed" },
+  // Queries -> the table each one starts from
+  { from: "shipQueries", to: "ADH_CRUISE_SHIP" },
+  { from: "upcomingQuery", to: "ADH_TRIP" },
+  { from: "tripQueries", to: "ADH_TRIP" },
+  { from: "createBooking", to: "ADH_BOOKING" },
+  { from: "groupBookings", to: "ADH_BOOKING" },
+  { from: "groupBookings", to: "ADH_CUSTOMER" },
+  { from: "plannedQueries", to: "ADH_CUSTOMER" },
+  { from: "loginQueries", to: "ADH_USER_ACCOUNT" },
+  { from: "schemaSeed", to: [1680, 1376], fromSide: "right" },
+  // Foreign keys: from the table holding the key to the table it refers to
+  { from: "ADH_SHIP_ACTIVITY", to: "ADH_CRUISE_SHIP", label: "SHIP_ID", fromSide: "bottom", toSide: "top" },
+  { from: "ADH_SHIP_ACTIVITY", to: "ADH_ACTIVITY", label: "ACTIVITY_ID" },
+  { from: "ADH_RESTAURANT", to: "ADH_CRUISE_SHIP", label: "SHIP_ID", midX: 1944 },
+  { from: "ADH_STATEROOM", to: "ADH_CRUISE_SHIP", label: "SHIP_ID", midX: 1974 },
+  { from: "ADH_STATEROOM", to: "ADH_STATEROOM_TYPE", label: "SR_TYPE_ID" },
+  { from: "ADH_STATEROOM", to: "ADH_CRUISE_SHIP_PART", label: "CS_PART_ID" },
+  { from: "ADH_TRIP", to: "ADH_CRUISE_SHIP", label: "SHIP_ID", fromSide: "top", toSide: "bottom" },
+  { from: "ADH_PORT_STOP", to: "ADH_TRIP", label: "TRIP_ID" },
+  { from: "ADH_PORT_STOP", to: "ADH_PORT", label: "PORT_ID" },
+  { from: "ADH_BOOKING", to: "ADH_TRIP", label: "TRIP_ID", fromSide: "top", toSide: "bottom" },
+  { from: "ADH_BOOKING", to: "ADH_STATEROOM", label: "STATEROOM_ID", fromSide: "top", toSide: "bottom", midY: 640 },
+  { from: "ADH_BOOKING", to: "ADH_GROUP", label: "GROUP_ID", fromSide: "bottom", toSide: "top" },
+  { from: "ADH_CUSTOMER", to: "ADH_GROUP", label: "GROUP_ID", fromSide: "top", toSide: "bottom" },
+  { from: "ADH_USER_ACCOUNT", to: "ADH_CUSTOMER", label: "CUSTOMER_ID", fromSide: "top", toSide: "bottom" },
+  { from: "ADH_PACKAGE_BOOKED", to: "ADH_BOOKING", label: "BOOKING_ID", midX: 1944 },
+  { from: "ADH_PACKAGE_BOOKED", to: "ADH_CUSTOMER", label: "CUSTOMER_ID", midX: 1944 },
+  { from: "ADH_PACKAGE_BOOKED", to: "ADH_PACKAGE", label: "PACKAGE_ID" },
+  { from: "ADH_TRANSACTION", to: "ADH_BOOKING", label: "BOOKING_ID", midX: 1964 },
+];
+
+// =============================================================================
+// DRAWING: no need to edit below this line
+// =============================================================================
+
+const STATUS = {
+  built:    { label: "✓ Built",   stroke: "#cbd5e1", text: "#e2e8f0" },
+  revising: { label: "✎ Revising", stroke: "#f59e0b", text: "#fcd34d" },
+  notbuilt: { label: "Not built", stroke: "#f87171", text: "#fca5a5" },
+};
+const OWNER_STYLE = { stroke: "#64748b", fill: "#1e293b", text: "#cbd5e1" };
+const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const svg = document.getElementById("chart");
+const measureCtx = document.createElement("canvas").getContext("2d");
+
+function el(name, attrs = {}, parent = svg) {
+  const node = document.createElementNS(SVG_NS, name);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  parent.appendChild(node);
+  return node;
+}
+
+function alpha(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+// Split "text with `code`" into [{text, code}] runs.
+function runs(text) {
+  return text.split("`").map((part, i) => ({ text: part, code: i % 2 === 1 })).filter((r) => r.text);
+}
+
+function runWidth(run, size, bold) {
+  measureCtx.font = `${bold ? 700 : 400} ${run.code ? size - 1 : size}px ${run.code ? MONO : FONT}`;
+  return measureCtx.measureText(run.text).width;
+}
+
+// Word-wrap a line of runs to maxWidth; returns an array of lines (arrays of runs).
+function wrap(text, size, bold, maxWidth) {
+  const words = [];
+  for (const run of runs(text)) {
+    for (const word of run.text.split(/(\s+)/)) if (word) words.push({ text: word, code: run.code });
+  }
+  const lines = [[]];
+  let width = 0;
+  for (const word of words) {
+    const w = runWidth(word, size, bold);
+    if (width + w > maxWidth && width > 0 && word.text.trim()) {
+      lines.push([]);
+      width = 0;
+    }
+    if (!(width === 0 && !word.text.trim())) {
+      lines[lines.length - 1].push(word);
+      width += w;
+    }
+  }
+  return lines;
+}
+
+function drawRuns(parent, lineRuns, x, y, size, bold, color, anchor = "start") {
+  const text = el("text", { x, y, "font-size": size, fill: color, "text-anchor": anchor,
+    "font-family": FONT, "font-weight": bold ? 700 : 400 }, parent);
+  for (const run of lineRuns) {
+    const span = el("tspan", {}, text);
+    if (run.code) {
+      span.setAttribute("font-family", MONO);
+      span.setAttribute("font-size", size - 1);
+      span.setAttribute("fill", bold ? color : "#bae6fd");
+    }
+    span.textContent = run.text;
+  }
+  return text;
+}
+
+function pill(parent, x, y, label, style) {
+  measureCtx.font = `600 11px ${FONT}`;
+  const w = measureCtx.measureText(label).width + 16;
+  el("rect", { x, y, width: w, height: 20, rx: 10, fill: style.fill || "#0f172a",
+    stroke: style.stroke, "stroke-width": 1.2 }, parent);
+  el("text", { x: x + w / 2, y: y + 14, "font-size": 11, "font-weight": 600, fill: style.text,
+    "text-anchor": "middle", "font-family": FONT }, parent).textContent = label;
+  return w;
+}
+
+const columnById = Object.fromEntries(COLUMNS.map((c) => [c.id, c]));
+const boxes = {};
+
+function layout(node) {
+  const col = columnById[node.col];
+  if (node.kind === "table") {
+    return { x: col.lanes[node.lane], y: node.y, w: col.laneW, h: node.h || 40 };
+  }
+  const pad = node.kind === "person" ? 24 : 24;
+  const x = col.x + pad;
+  const w = col.w - pad * 2;
+  return { x, y: node.y, w, h: node.h || 72 };
+}
+
+function draw() {
+  svg.replaceChildren();
+  const defs = el("defs");
+  for (const [id, color] of [["arrow", "#cbd5e1"], ["arrow-hot", "#ffffff"]]) {
+    const marker = el("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7,
+      markerHeight: 7, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", fill: color }, marker);
+  }
+
+  // Box sizes (grow to fit their text).
+  for (const node of NODES) {
+    const box = layout(node);
+    if (node.kind !== "table" && node.kind !== "person") {
+      const size = node.small ? 12 : 13.5;
+      const lineH = size * 1.45;
+      let count = wrap(node.title, size + 0.5, true, box.w - 24).length;
+      for (const line of node.lines || []) count += wrap(line, size, false, box.w - 24).length;
+      box.h = Math.max(box.h, 22 + count * lineH);
+    }
+    boxes[node.id] = { ...box, node };
+  }
+
+  const height = Math.max(...Object.values(boxes).map((b) => b.y + b.h)) + 40;
+  const width = Math.max(...COLUMNS.map((c) => c.x + c.w)) + 8;
+  const top = -44;
+  svg.setAttribute("viewBox", `-8 ${top} ${width + 8} ${height - top}`);
+  svg.setAttribute("width", width + 8);
+  svg.setAttribute("height", height - top);
+
+  // Columns.
+  for (const col of COLUMNS) {
+    el("rect", { x: col.x, y: 0, width: col.w, height: height - 16, rx: 14,
+      fill: alpha(col.color, 0.07), stroke: alpha(col.color, 0.45), "stroke-width": 1.2 });
+    el("text", { x: col.x + 4, y: -14, "font-size": 15, "font-weight": 700, fill: col.color,
+      "font-family": FONT }).textContent = col.title;
+    if (col.note) {
+      const g = el("g");
+      wrap(col.note, 12, false, col.w - 48).forEach((line, i) =>
+        drawRuns(g, line, col.x + 24, 34 + i * 17, 12, false, "#94a3b8"));
+    }
+  }
+
+  // Edges (under the boxes).
+  const edgeLayer = el("g");
+  for (const edge of EDGES) drawEdge(edgeLayer, edge);
+
+  // Boxes.
+  for (const node of NODES) drawNode(node);
+
+  // Hover highlighting.
+  for (const g of svg.querySelectorAll(".node")) {
+    g.addEventListener("mouseenter", () => highlight(g.dataset.id));
+    g.addEventListener("mouseleave", () => highlight(null));
+  }
+}
+
+function anchor(box, side) {
+  switch (side) {
+    case "left": return { x: box.x, y: box.y + box.h / 2 };
+    case "right": return { x: box.x + box.w, y: box.y + box.h / 2 };
+    case "top": return { x: box.x + box.w / 2, y: box.y };
+    default: return { x: box.x + box.w / 2, y: box.y + box.h };
+  }
+}
+
+function defaultSides(a, b) {
+  if (b.x >= a.x + a.w) return ["right", "left"];
+  if (b.x + b.w <= a.x) return ["left", "right"];
+  return b.y > a.y ? ["bottom", "top"] : ["top", "bottom"];
+}
+
+function route(edge) {
+  const a = boxes[edge.from];
+  if (Array.isArray(edge.to)) {
+    const p0 = anchor(a, edge.fromSide || "right");
+    return [p0, { x: edge.to[0], y: edge.to[1] }];
+  }
+  const b = boxes[edge.to];
+  const [defFrom, defTo] = defaultSides(a, b);
+  const fromSide = edge.fromSide || defFrom;
+  const toSide = edge.toSide || defTo;
+  const p0 = anchor(a, fromSide);
+  const p3 = anchor(b, toSide);
+  const horizontal = (s) => s === "left" || s === "right";
+  if (horizontal(fromSide) && horizontal(toSide)) {
+    if (Math.abs(p0.y - p3.y) < 1) return [p0, p3];
+    const mx = edge.midX ?? (p0.x + p3.x) / 2;
+    return [p0, { x: mx, y: p0.y }, { x: mx, y: p3.y }, p3];
+  }
+  if (!horizontal(fromSide) && !horizontal(toSide)) {
+    if (Math.abs(p0.x - p3.x) < 1) return [p0, p3];
+    const my = edge.midY ?? (p0.y + p3.y) / 2;
+    return [p0, { x: p0.x, y: my }, { x: p3.x, y: my }, p3];
+  }
+  if (horizontal(fromSide)) return [p0, { x: p3.x, y: p0.y }, p3];
+  return [p0, { x: p0.x, y: p3.y }, p3];
+}
+
+function drawEdge(layer, edge) {
+  const points = route(edge);
+  const ends = [edge.from, Array.isArray(edge.to) ? null : edge.to];
+  const dashed = edge.dashed ?? ends.some((id) => id && boxes[id].node.status === "notbuilt");
+  const g = el("g", { class: "edge" }, layer);
+  g.dataset.ends = ends.filter(Boolean).join(" ");
+  const d = points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
+  el("path", { d, fill: "none", stroke: "#cbd5e1", "stroke-width": 1.6,
+    "stroke-dasharray": dashed ? "6 5" : "none", "marker-end": "url(#arrow)" }, g);
+  if (edge.label) {
+    // Put the label on the longest segment.
+    let best = 0, at = { x: 0, y: 0 };
+    for (let i = 1; i < points.length; i++) {
+      const len = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      if (len > best) {
+        best = len;
+        at = { x: (points[i].x + points[i - 1].x) / 2, y: (points[i].y + points[i - 1].y) / 2 };
+      }
+    }
+    measureCtx.font = `600 10.5px ${MONO}`;
+    const w = measureCtx.measureText(edge.label).width + 10;
+    el("rect", { x: at.x - w / 2, y: at.y - 9, width: w, height: 18, rx: 4, fill: "#0b1120",
+      stroke: "#334155" }, g);
+    el("text", { x: at.x, y: at.y + 4, "font-size": 10.5, "font-weight": 600, fill: "#fdba74",
+      "text-anchor": "middle", "font-family": MONO }, g).textContent = edge.label;
+  }
+}
+
+function drawNode(node) {
+  const box = boxes[node.id];
+  const col = columnById[node.col];
+  const status = STATUS[node.status];
+  const g = el("g", { class: "node" });
+  g.dataset.id = node.id;
+  g.style.cursor = "default";
+
+  if (node.kind === "person") {
+    el("rect", { x: box.x, y: box.y, width: box.w, height: box.h, rx: 16,
+      fill: alpha(col.color, 0.22), stroke: col.color, "stroke-width": 1.5 }, g);
+    const cx = box.x + box.w / 2;
+    el("circle", { cx, cy: box.y + 46, r: 18, fill: "none", stroke: col.color, "stroke-width": 2.5 }, g);
+    el("path", { d: `M${cx - 32},${box.y + 104} q32,-48 64,0`, fill: "none", stroke: col.color,
+      "stroke-width": 2.5, "stroke-linecap": "round" }, g);
+    el("text", { x: cx, y: box.y + 132, "font-size": 15, "font-weight": 700, fill: "#f1f5f9",
+      "text-anchor": "middle", "font-family": FONT }, g).textContent = node.title;
+    return;
+  }
+
+  const notBuilt = node.status === "notbuilt";
+  el("rect", { x: box.x, y: box.y, width: box.w, height: box.h, rx: node.kind === "table" ? 8 : 12,
+    fill: notBuilt ? "rgba(15, 23, 42, 0.6)" : alpha(col.color, node.kind === "table" ? 0.2 : 0.16),
+    stroke: col.color, "stroke-width": 1.5, "stroke-dasharray": notBuilt ? "7 5" : "none" }, g);
+
+  if (node.kind === "table") {
+    measureCtx.font = `600 12.5px ${MONO}`;
+    el("text", { x: box.x + box.w / 2, y: box.y + 25, "font-size": 12.5, "font-weight": 600,
+      fill: "#fed7aa", "text-anchor": "middle", "font-family": MONO }, g).textContent = node.id;
+  } else {
+    const size = node.small ? 12 : 13.5;
+    const lineH = size * 1.45;
+    let y = box.y + 22 + size * 0.4;
+    for (const line of wrap(node.title, size + 0.5, true, box.w - 24)) {
+      drawRuns(g, line, box.x + 12, y, size + 0.5, true, "#f8fafc");
+      y += lineH;
+    }
+    for (const text of node.lines || []) {
+      for (const line of wrap(text, size, false, box.w - 24)) {
+        drawRuns(g, line, box.x + 12, y, size, false, "#cbd5e1");
+        y += lineH;
+      }
+    }
+  }
+
+  // Tags straddling the top edge: owner on the left, status on the right.
+  if (node.owner) pill(g, box.x + 8, box.y - 10, node.owner, OWNER_STYLE);
+  if (status) {
+    measureCtx.font = `600 11px ${FONT}`;
+    const w = measureCtx.measureText(status.label).width + 16;
+    pill(g, box.x + box.w - w - 8, box.y - 10, status.label, status);
+  }
+}
+
+function highlight(id) {
+  svg.classList.toggle("dimmed", Boolean(id));
+  for (const g of svg.querySelectorAll(".node, .edge")) g.classList.remove("hot");
+  if (!id) return;
+  for (const g of svg.querySelectorAll(".edge")) {
+    const ends = g.dataset.ends.split(" ");
+    if (ends.includes(id)) {
+      g.classList.add("hot");
+      for (const end of ends) svg.querySelector(`.node[data-id="${end}"]`)?.classList.add("hot");
+    }
+  }
+  svg.querySelector(`.node[data-id="${id}"]`)?.classList.add("hot");
+}
+
+function drawLegend() {
+  const legend = document.getElementById("legend");
+  const items = Object.values(STATUS).map((s) =>
+    `<span><span class="pill" style="color:${s.text};border-color:${s.stroke}">${s.label}</span></span>`);
+  items.push(`<span><span class="pill" style="color:${OWNER_STYLE.text};border-color:${OWNER_STYLE.stroke};background:${OWNER_STYLE.fill}">Name</span> owner</span>`);
+  items.push(`<span><span class="swatch"></span> built or revising</span>`);
+  items.push(`<span><span class="swatch notbuilt"></span> not built yet</span>`);
+  items.push(`<span><span class="line"></span> connection</span>`);
+  items.push(`<span><span class="line dashed"></span> not built yet</span>`);
+  legend.innerHTML = items.join("");
+}
+
+// Zoom and pan: scroll to zoom toward the pointer, drag to move around,
+// or use the buttons (keys + - 0). Works by changing the SVG's viewBox.
+function setupZoom() {
+  const stage = document.getElementById("stage");
+  const svg = document.getElementById("chart");
+  const home = svg.getAttribute("viewBox").split(" ").map(Number);
+  let view = [...home];
+  const MIN = 1, MAX = 8; // zoom limits, relative to the whole chart
+
+  const apply = () => svg.setAttribute("viewBox", view.join(" "));
+  const toChart = (clientX, clientY) => {
+    const pt = new DOMPoint(clientX, clientY).matrixTransform(svg.getScreenCTM().inverse());
+    return [pt.x, pt.y];
+  };
+
+  function zoom(factor, clientX, clientY) {
+    const zoomNow = home[2] / view[2];
+    const zoomNext = Math.min(MAX, Math.max(MIN, zoomNow * factor));
+    if (zoomNext === zoomNow) return;
+    const f = zoomNext / zoomNow;
+    if (clientX === undefined) {
+      const r = stage.getBoundingClientRect();
+      clientX = r.left + r.width / 2;
+      clientY = r.top + r.height / 2;
+    }
+    const [px, py] = toChart(clientX, clientY);
+    view = [px - (px - view[0]) / f, py - (py - view[1]) / f, view[2] / f, view[3] / f];
+    if (zoomNext === MIN) view = [...home];
+    apply();
+  }
+
+  stage.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoom(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+  }, { passive: false });
+
+  let drag = null;
+  stage.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest(".zoom")) return;
+    e.preventDefault();
+    drag = { x: e.clientX, y: e.clientY, view: [...view], scale: svg.getScreenCTM().a };
+    stage.setPointerCapture(e.pointerId);
+    stage.classList.add("panning");
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    view = [drag.view[0] - (e.clientX - drag.x) / drag.scale,
+            drag.view[1] - (e.clientY - drag.y) / drag.scale, view[2], view[3]];
+    apply();
+  });
+  const endDrag = () => { drag = null; stage.classList.remove("panning"); };
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+
+  document.getElementById("zoom-in").onclick = () => zoom(1.4);
+  document.getElementById("zoom-out").onclick = () => zoom(1 / 1.4);
+  document.getElementById("zoom-reset").onclick = () => { view = [...home]; apply(); };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "+" || e.key === "=") zoom(1.4);
+    else if (e.key === "-") zoom(1 / 1.4);
+    else if (e.key === "0") { view = [...home]; apply(); }
+  });
+}
+
+draw();
+drawLegend();
+setupZoom();
+</script>
+</body>
+</html>

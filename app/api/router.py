@@ -9,6 +9,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.home import router as home_router
 from app.api.routes.create_trip import router as trips_router
 from app.api.routes.current_trips import router as current_trips_router
+from app.api.routes.available_trips import router as available_trips_router
 from app.api.routes.delete_trip import router as delete_trip_router
 from app.api.routes.current_ships import router as current_ships_router
 from app.api.routes.create_ship import router as create_ship_router
@@ -23,6 +24,7 @@ api_router.include_router(health_router)
 
 api_router.include_router(trips_router)
 api_router.include_router(current_trips_router)
+api_router.include_router(available_trips_router)
 api_router.include_router(delete_trip_router)
 
 api_router.include_router(create_ship_router)

@@ -6,52 +6,99 @@
 - `hc4288 - Hoi Cheng`
 - `as23663 - Ahana Shaikh`
 
-## Database Design
+## Architecture and Database Design
 
-The tables, columns, relationships and rules are documented in
-[`docs/database.md`](docs/database.md), including an ER diagram.
+- [`docs/project_Roadmap.html`](docs/project_Roadmap.html) charts every component:
+  the pages, API endpoints, database queries and tables, how they connect, who
+  owns each one, and whether it's built, being revised or not built yet. Open
+  it in a browser (double-click it; no server needed). To update it, edit the
+  DATA section at the top of its `<script>`: one entry per box and per arrow.
+- [`docs/database.md`](docs/database.md) documents the tables, columns,
+  relationships and rules, including an ER diagram.
 
 ## Local Setup
 
-You only need to do steps 1–4 once per machine. After that, start MySQL in XAMPP
-and run the API (step 5).
+You only need to do steps 1–5 once per machine. After that, each time you work
+on the project: start MySQL in XAMPP, activate the virtual environment (step 3)
+and run the API (step 6).
 
 ### 1. Start MySQL
 
 Open the XAMPP Control Panel and click **Start** next to **MySQL**. Leave it
-running while you work.
+running while you work. Note the number in its **Port(s)** column, usually
+`3306` but sometimes `3307` (for example when another MySQL already uses
+3306). You'll need it in step 4.
 
-### 2. Install the Python dependencies
+MySQL Workbench is only a viewer: having it open doesn't start the MySQL
+server.
 
-From the project root:
+### 2. Check your Python
 
-```bash
-pip install -r requirements.txt
+You need the standard Python 3.10 or newer from
+[python.org](https://www.python.org/downloads/), 64-bit. On Windows, list the
+versions you have with:
+
+```powershell
+py --list
 ```
 
-### 3. Create your `.env` file
+Don't use the Python that comes with MSYS2 or Cygwin (`python` pointing into a
+folder like `C:\msys64\...`): pip can't install `pydantic-core`, which FastAPI
+needs, on those.
+
+### 3. Create a virtual environment and install the dependencies
+
+A virtual environment (`.venv`) is this project's own copy of Python and its
+packages. From the project root on Windows (PowerShell), using a version from
+`py --list`:
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+On macOS or Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Your prompt now starts with `(.venv)`. Activate it again (the second line) in
+every new terminal before running the project. If PowerShell says running
+scripts is disabled, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+once, then try again. `.venv` is ignored by git.
+
+### 4. Create your `.env` file
 
 Copy `.env.example` to a new file named `.env` in the project root:
 
 ```bash
 cp .env.example .env        # macOS / Linux / Git Bash
-copy .env.example .env      # Windows Command Prompt
+copy .env.example .env      # Windows (PowerShell or Command Prompt)
 ```
 
-Then open `.env` and fill it in:
+Then open `.env` and check it:
 
 | Setting               | What to put                                                                 |
 | --------------------- | --------------------------------------------------------------------------- |
+| `MYSQL_HOST`          | Keep `127.0.0.1`.                                                           |
+| `MYSQL_PORT`          | The MySQL port from the XAMPP Control Panel (step 1), usually `3306`.       |
 | `MYSQL_ROOT_USER`     | `root` (XAMPP's default admin).                                             |
 | `MYSQL_ROOT_PASSWORD` | Leave blank. XAMPP's root has no password unless you set one yourself.      |
 | `MYSQL_USER`          | `root` for local demos (the team default). Or any other name, and the setup script creates that user with no permission to drop or alter tables. |
-| `MYSQL_PASSWORD`      | Blank when `MYSQL_USER` is `root`. Otherwise any password for that user.     |
+| `MYSQL_PASSWORD`      | Blank when `MYSQL_USER` is `root`, unless your root has a password: then put it here too. Otherwise any password for your user. |
 | `MYSQL_DATABASE`      | Keep `da2410hc4288as23663`.                                                 |
 
-`MYSQL_HOST` and `MYSQL_PORT` default to `127.0.0.1:3306`, which is what XAMPP
-uses. `.env` is ignored by git, so your passwords stay on your machine.
+`.env` is ignored by git, so your settings stay on your machine. If you change
+`.env` while the API is running, stop it and start it again (step 6): it only
+reads `.env` when it starts.
 
-### 4. Set up the database
+### 5. Set up the database
 
 ```bash
 python -m app.database.init_db
@@ -78,14 +125,31 @@ python -m app.database.init_db --reset
 
 It asks for confirmation first; add `--yes` to skip the prompt.
 
-### 5. Run the API
+### 6. Run the API
+
+With MySQL running and the virtual environment active (`(.venv)` in your
+prompt):
 
 ```bash
 uvicorn main:app --reload
 ```
 
-Then open <http://127.0.0.1:8000/health/mysql>. You should see
-`{"status": "ok", "database": "da2410hc4288as23663"}`.
+When it prints `Uvicorn running on http://127.0.0.1:8000`, open
+<http://127.0.0.1:8000/health/mysql>. You should see
+`{"status": "ok", "database": "da2410hc4288as23663"}`. Leave the terminal open
+while you work; press **Ctrl+C** in it to stop the server.
+
+### Viewing the pages locally
+
+With the server running, open the pages in your browser at
+<http://127.0.0.1:8000/>, for example <http://127.0.0.1:8000/book-cruise>
+(see [Application Pages](#application-pages)). `--reload` restarts the server
+when you save a Python file. After editing HTML, CSS or JavaScript, refresh the
+page.
+
+You can also double-click a file in `app/static/` to see its layout without the
+server, but data such as the trip list won't load: pages get their data from the
+API, which only answers at `http://127.0.0.1:8000`.
 
 ## Changing the Schema or Dummy Data
 
@@ -115,9 +179,13 @@ These are for the local demo only. Customers under 18 have no login.
 
 | Error                                    | Fix                                                                                 |
 | ---------------------------------------- | ----------------------------------------------------------------------------------- |
-| `Can't reach MySQL at 127.0.0.1:3306`    | Start MySQL in the XAMPP Control Panel.                                             |
-| `MySQL rejected the admin login for 'root'` | You've set a root password in XAMPP. Put it in `MYSQL_ROOT_PASSWORD`.            |
-| `No .env file found`                     | Do step 3.                                                                          |
+| `Failed to build 'pydantic-core'` during `pip install` | Your Python isn't the standard python.org build (e.g. it's MSYS2's). Use steps 2–3: a virtual environment made with `py`. |
+| `py`, `python` or `uvicorn` "is not recognized" | Activate the virtual environment (`.venv\Scripts\activate`), or run `python -m uvicorn main:app --reload`. If `py` itself is missing, install Python from python.org. |
+| `running scripts is disabled on this system` | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then activate again. |
+| `Can't reach MySQL at 127.0.0.1:3306`    | Start MySQL in the XAMPP Control Panel. If it's already running, check its port there and set `MYSQL_PORT` in `.env` to match (e.g. `3307`). |
+| `MySQL rejected the admin login for 'root'` | You've set a root password. Put it in `MYSQL_ROOT_PASSWORD`, and in `MYSQL_PASSWORD` too while `MYSQL_USER` is `root`. |
+| `No .env file found`                     | Do step 4.                                                                          |
+| `/health/mysql` says "MySQL database unavailable", or a page says "Couldn't load trips" | The API can't reach MySQL. Stop the server, run `python -m app.database.init_db` to see the exact error and fix it as above, then start the server again (it only reads `.env` when it starts). |
 | `Note: MYSQL_USER is the admin user 'root'` | Expected with the team default. The app can drop and alter tables when it logs in as root. Use a separate `MYSQL_USER` if you want that blocked. |
 | `sql/seed.sql, statement N failed: ...`  | Fix that statement (the error shows it), then run with `--reset`. A failed seed is rolled back, so no partial data is left. |
 
@@ -141,6 +209,7 @@ These are for the local demo only. Customers under 18 have no login.
 | --- | --- | --- |
 | `POST` | `/create_trip` | Creates a trip. JSON body: `start_date`, `end_date`, `ship_id`; MySQL generates `trip_id`. The end date must be after the start date, and the ship must exist. |
 | `GET` | `/current_trips` | Returns all trips with `TRIP_ID`, `START_DATE`, `END_DATE`, and `SHIP_ID`. |
+| `GET` | `/available_trips` | Returns trips starting today or later, soonest first, each with `TRIP_ID`, `START_DATE`, `END_DATE`, `NIGHTS`, `SHIP_ID`, `SHIP_NAME` and `PORT_STOPS` (in order, with port name, city, country, arrival and departure). Returns an empty list when nothing is scheduled. Used by the Book a cruise page. |
 | `DELETE` | `/delete_trip/{trip_id}` | Deletes a trip by ID. |
 
 
@@ -149,6 +218,7 @@ These are for the local demo only. Customers under 18 have no login.
 | Route | Page |
 | --- | --- |
 | `/` | Public home page |
+| `/book-cruise` | Public list of upcoming trips (booking not built yet) |
 | `/dashboard` | Regular-user dashboard |
 | `/admin/dashboard` | Admin dashboard |
 | `/admin/cruise-trips` | Admin cruise-trip management prototype |

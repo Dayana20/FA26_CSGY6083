@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#155eef" />
+    <title>My Dashboard | ADH Cruises</title>
+    <link rel="stylesheet" href="../static/styles.css?v=2" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="ADH Cruises home">ADH Cruises</a>
+      <nav class="navigation" aria-label="Main navigation">
+        <a class="nav-link" href="#trips">My Trips</a>
+        <a class="button button-light" href="/">Sign Out</a>
+      </nav>
+    </header>
+
+    <main class="dashboard">
+      <section class="dashboard-heading">
+        <h1>Welcome back!</h1>
+      </section>
+
+      <section class="dashboard-section" id="trips">
+        <div class="section-heading">
+          <div>
+            <p class="section-label">UP NEXT</p>
+            <h2>Your trips</h2>
+          </div>
+        </div>
+        <article class="empty-state">
+          <h3>No trips booked yet</h3>
+          <p>When you book a cruise, your trip details will appear here.</p>
+          <a class="button button-primary" href="/">Explore cruises</a>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

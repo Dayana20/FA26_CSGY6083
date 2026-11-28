@@ -1,3 +1,9 @@
+"""Tests for get_connection() in app/database/mysql.py.
+
+MySQL itself is never contacted: mysql.connector.connect is replaced with a
+mock, so these tests run without XAMPP.
+"""
+
 from unittest.mock import patch
 
 import mysql.connector
@@ -6,8 +12,13 @@ import pytest
 from app.database.mysql import get_connection
 
 
+# -----------------------------------------------------------------------------
+# Fixtures
+# -----------------------------------------------------------------------------
+
 @pytest.fixture
 def mysql_environment(monkeypatch):
+    """Set fake MYSQL_* settings for the duration of one test."""
     monkeypatch.setenv("MYSQL_HOST", "127.0.0.1")
     monkeypatch.setenv("MYSQL_PORT", "3306")
     monkeypatch.setenv("MYSQL_USER", "test_user")
@@ -15,8 +26,13 @@ def mysql_environment(monkeypatch):
     monkeypatch.setenv("MYSQL_DATABASE", "test_db")
 
 
+# -----------------------------------------------------------------------------
+# Tests
+# -----------------------------------------------------------------------------
+
 @patch("app.database.mysql.mysql.connector.connect")
 def test_get_connection_uses_environment_settings(mock_connect, mysql_environment):
+    """get_connection() passes the MYSQL_* settings to mysql.connector.connect."""
     mock_connect.return_value = object()
     assert get_connection() is mock_connect.return_value
     mock_connect.assert_called_once_with(
@@ -30,6 +46,7 @@ def test_get_connection_uses_environment_settings(mock_connect, mysql_environmen
 
 @patch("app.database.mysql.mysql.connector.connect")
 def test_get_connection_raises_when_mysql_is_unavailable(mock_connect, mysql_environment):
+    """A MySQL connection error is passed on to the caller unchanged."""
     mock_connect.side_effect = mysql.connector.Error("connection refused")
     with pytest.raises(mysql.connector.Error, match="connection refused"):
         get_connection()

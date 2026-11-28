@@ -1,3 +1,11 @@
+"""Entry point for the Cruise Trip Booking API.
+
+Start the development server from the project root with:
+
+    uvicorn main:app --reload
+
+The API documentation is then at http://127.0.0.1:8000/docs.
+"""
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -9,10 +17,12 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.api.router import api_router
 from app.core.config import get_session_settings
 
+# Load the MySQL settings from .env into the environment before anything
+# connects to the database.
 load_dotenv()
 
 _DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
-_NO_STORE_PREFIXES = ("/login", "/register", "/logout", "/account", "/employee", "/auth", "/api/employee")
+_NO_STORE_PREFIXES = ("/login", "/register", "/logout", "/account", "/employee", "/auth", "/api/employee", "/dashboard", "/admin")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -40,6 +50,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 session_settings = get_session_settings()
 
+# Create the FastAPI application and register every endpoint
+# (see app/api/router.py for the list).
 app = FastAPI()
 app.add_middleware(
     SessionMiddleware,
@@ -50,9 +62,9 @@ app.add_middleware(
     https_only=session_settings.https_only,
 )
 app.add_middleware(SecurityHeadersMiddleware)
+app.include_router(api_router)
 app.mount(
     "/static",
     StaticFiles(directory=Path(__file__).resolve().parent / "app" / "static"),
     name="static",
 )
-app.include_router(api_router)

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#155eef" />
+    <title>Manage Cruise Trips | ADH Cruises</title>
+    <link rel="stylesheet" href="../static/styles.css?v=4" />
+    <script src="../static/cruise-trips.js?v=4" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="ADH Cruises home">ADH Cruises</a>
+      <nav class="navigation" aria-label="Main navigation">
+        <a class="nav-link" href="/admin/dashboard">Admin dashboard</a>
+        <a class="button button-light" href="/">Sign Out</a>
+      </nav>
+    </header>
+
+    <main class="dashboard">
+      <a class="back-link" href="/admin/dashboard">&larr; Back to admin dashboard</a>
+      <section class="dashboard-heading">
+        <p class="section-label">ADMINISTRATION</p>
+        <h1>Manage cruise trips</h1>
+        <p class="page-description">
+          Create cruise itineraries for customers to browse and book.
+        </p>
+      </section>
+
+      <section class="dashboard-section trip-form-section" aria-labelledby="add-trip-heading">
+        <h2 id="add-trip-heading">Add a cruise trip</h2>
+        <form id="trip-form" class="trip-form">
+          <div class="trip-basics">
+            <label>
+              Cruise ship
+              <select id="ship-name" name="ship-name" required>
+                <option value="">Select a ship</option>
+                <option>Ocean Waves</option>
+                <option>Coral Diamond</option>
+                <option>Starry Night</option>
+                <option>Lazy Horse</option>
+                <option>Badoop Bee</option>
+                <option>Balderdash</option>
+                <option>Fiddlesticks</option>
+                <option>Tomfoolery</option>
+                <option>Brouhaha</option>
+                <option>Malarkey</option>
+                <option>Flummox</option>
+                <option>Rigamarole</option>
+                <option>Folderol</option>
+                <option>Claptrap</option>
+                <option>Moonshine</option>
+                <option>Hocus Pocus</option>
+                <option>Codswallop</option>
+                <option>Giggle Gaggle</option>
+                <option>Whippersnapper</option>
+                <option>Shenanigans</option>
+              </select>
+            </label>
+            <label>
+              Start date
+              <input id="start-date" name="start-date" type="date" required />
+            </label>
+            <label>
+              End date
+              <input id="end-date" name="end-date" type="date" required />
+            </label>
+          </div>
+
+          <div class="itinerary-heading">
+            <div>
+              <h3>Itinerary</h3>
+              <p>Add each port stop in sailing order, including arrival and departure.</p>
+            </div>
+            <button class="button button-secondary" id="add-stop" type="button">
+              Add port stop
+            </button>
+          </div>
+
+          <div id="port-stops" class="port-stops"></div>
+          <div class="trip-form-actions">
+            <button class="button button-primary" type="submit">Create trip</button>
+          </div>
+        </form>
+        <p id="trip-message" class="trip-message" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="trip-list-heading">
+        <div class="section-heading">
+          <h2 id="trip-list-heading">Scheduled trips</h2>
+          <span id="trip-count" class="trip-count"></span>
+        </div>
+        <div class="trip-list" id="trip-list"></div>
+      </section>
+    </main>
+  </body>
+</html>

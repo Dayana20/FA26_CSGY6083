@@ -203,6 +203,22 @@ These are for the local demo only. Customers under 18 have no login.
 | `GET` | `/get_cruises` | Returns all ships with `SHIP_ID`, `SHIP_NAME`, and `NO_OF_FLOORS`. |
 | `DELETE` | `/delete_cruise/{ship_id}` | Deletes a ship by ID. A ship referenced by a trip cannot be deleted. |
 
+### Ports
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/current_ports` | Returns all ports ordered by `PORT_ID` in a `ports` list, with `PORT_ID`, `PORT_NAME`, `STREET`, `CITY`, `STATE`, `ZIPCODE`, `COUNTRY`, `NEAREST_AIRPORT`, and `PARKING_CAPACITY`. Returns an empty list when there are no ports. |
+| `POST` | `/create_port` | Creates a port and returns its generated `port_id`. JSON body requires `port_name`, `street`, `city`, `country`, and `nearest_airport`; `port_name` cannot be blank. `state`, `zipcode`, and `parking_capacity` are optional. If provided, `state` must be two uppercase letters, `zipcode` a five-digit string, and `parking_capacity` an integer from 0 to 999. |
+| `DELETE` | `/delete_port/{port_id}` | Deletes a port by ID. Returns 404 if it does not exist; a port referenced by a trip stop cannot be deleted (409). |
+
+### Port stops
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/current_port_stops` | Returns all port stops in a `port_stops` list, ordered by `TRIP_ID` and `STOP_NO`, with `STOP_NO`, `PSTART_DATE`, `PEND_DATE`, `TRIP_ID`, and `PORT_ID`. Returns an empty list when there are no stops. |
+| `POST` | `/create_port_stop` | Creates a stop. JSON body requires `stop_no`, `pstart_date`, `pend_date`, `trip_id`, and `port_id`; the trip and port must exist, and the stop number must be unique within the trip. Dates must have no time zone or fractional seconds, and departure must be on or after arrival. Returns `trip_id` and `stop_no`. |
+| `DELETE` | `/delete_port_stop/{trip_id}/{stop_no}` | Deletes the stop identified by its trip ID and stop number. Returns 404 if it does not exist. |
+
 ### Trips
 
 | Method | Route | Description |

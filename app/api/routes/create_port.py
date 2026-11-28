@@ -1,5 +1,6 @@
 """Create a new port in the database."""
 
+import logging
 from typing import Optional
 
 import mysql.connector
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.database.mysql import get_connection
 
 router = APIRouter(tags=["ports"])
+logger = logging.getLogger("uvicorn.error")
 
 
 class PortCreate(BaseModel):
@@ -25,6 +27,7 @@ class PortCreate(BaseModel):
 @router.post("/create_port", status_code=status.HTTP_201_CREATED)
 def create_port(port: PortCreate):
     """Create a port record."""
+    logger.info("Creating port port_name=%r", port.port_name)
     connection = None
     cursor = None
     try:
@@ -50,7 +53,9 @@ def create_port(port: PortCreate):
         )
         port_id = cursor.lastrowid
         connection.commit()
+        logger.info("Committed port port_id=%s port_name=%r", port_id, port.port_name)
     except mysql.connector.IntegrityError as exc:
+        logger.exception("Port creation failed due to a database constraint")
         if connection is not None:
             connection.rollback()
         raise HTTPException(
@@ -58,6 +63,7 @@ def create_port(port: PortCreate):
             detail="Port conflicts with a database constraint",
         ) from exc
     except (mysql.connector.Error, KeyError, ValueError) as exc:
+        logger.exception("Port creation failed due to a database or configuration error")
         if connection is not None:
             connection.rollback()
         raise HTTPException(

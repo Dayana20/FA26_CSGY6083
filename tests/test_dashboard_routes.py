@@ -33,4 +33,6 @@ def test_admin_cruise_trip_management_page():
     assert "Start date" in response.text
     assert "End date" in response.text
     assert "Itinerary" in response.text
-    assert "reset when this page is refreshed" in response.text
+    assert 'id="trip-list-message"' in response.text
+    assert 'src="../static/cruise-trips.js?v=8"' in response.text
+    assert 'id="trip-diagnostics"' not in response.text

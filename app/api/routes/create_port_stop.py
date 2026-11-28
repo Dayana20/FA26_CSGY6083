@@ -1,6 +1,7 @@
 """Create a port stop for a trip."""
 
 from datetime import datetime
+import logging
 
 import mysql.connector
 from fastapi import APIRouter, HTTPException, status
@@ -9,13 +10,13 @@ from pydantic import BaseModel, Field, field_validator
 from app.database.mysql import get_connection
 
 router = APIRouter(tags=["port stops"])
+logger = logging.getLogger("uvicorn.error")
 
 
-class PortStopCreate(BaseModel):
+class PortStopDetails(BaseModel):
     stop_no: int = Field(ge=1, le=32767)
     pstart_date: datetime
     pend_date: datetime
-    trip_id: int = Field(gt=0, le=2147483647)
     port_id: int = Field(gt=0, le=2147483647)
 
     @field_validator("pstart_date", "pend_date")
@@ -28,10 +29,23 @@ class PortStopCreate(BaseModel):
         return value
 
 
+class PortStopCreate(PortStopDetails):
+    trip_id: int = Field(gt=0, le=2147483647)
+
+
 @router.post("/create_port_stop", status_code=status.HTTP_201_CREATED)
 def create_port_stop(port_stop: PortStopCreate):
     """Create a port stop using its trip ID and stop number."""
+    logger.info(
+        "Creating port stop trip_id=%s stop_no=%s port_id=%s arrival=%s departure=%s",
+        port_stop.trip_id, port_stop.stop_no, port_stop.port_id,
+        port_stop.pstart_date, port_stop.pend_date,
+    )
     if port_stop.pend_date < port_stop.pstart_date:
+        logger.warning(
+            "Port stop creation rejected: departure before arrival trip_id=%s stop_no=%s",
+            port_stop.trip_id, port_stop.stop_no,
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="pend_date must be on or after pstart_date",
@@ -57,7 +71,15 @@ def create_port_stop(port_stop: PortStopCreate):
             ),
         )
         connection.commit()
+        logger.info(
+            "Committed port stop trip_id=%s stop_no=%s port_id=%s",
+            port_stop.trip_id, port_stop.stop_no, port_stop.port_id,
+        )
     except mysql.connector.IntegrityError as exc:
+        logger.exception(
+            "Port stop creation failed due to a database constraint trip_id=%s stop_no=%s",
+            port_stop.trip_id, port_stop.stop_no,
+        )
         if connection is not None:
             connection.rollback()
         if exc.errno == 1452:
@@ -70,6 +92,10 @@ def create_port_stop(port_stop: PortStopCreate):
             detail="Port stop conflicts with a database constraint",
         ) from exc
     except (mysql.connector.Error, KeyError, ValueError) as exc:
+        logger.exception(
+            "Port stop creation failed due to a database or configuration error trip_id=%s stop_no=%s",
+            port_stop.trip_id, port_stop.stop_no,
+        )
         if connection is not None:
             connection.rollback()
         raise HTTPException(
